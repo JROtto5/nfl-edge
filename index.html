@@ -156,6 +156,8 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .callbox{border-radius:11px;padding:11px 13px;display:flex;flex-direction:column;gap:4px;border:2px solid var(--line);background:var(--bg2)}
 .callbox.bet{border-color:var(--green)}
 .callbox.live{border-color:var(--amber)}
+.callbox.strongcut{border-color:var(--line);border-style:dashed}
+.callbox.strongcut .cb1{font-size:15px}
 .callbox .cb1{font-size:18px;font-weight:800;letter-spacing:.01em;line-height:1.2}
 .callbox .cb2{font-size:13px;color:var(--dim)}
 .callbox .cb3{font-weight:400;color:var(--dim)}
@@ -170,6 +172,7 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .sigs{display:flex;flex-wrap:wrap;gap:5px}
 .sig{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);color:var(--dim);background:var(--bg2);letter-spacing:.02em}
 .sig.strong{border-color:var(--green);color:var(--green);font-weight:700}
+.sig.ext{border-color:var(--amber);color:var(--amber)}
 .more summary{font-size:12px;color:var(--dim);cursor:pointer;list-style:none;padding:6px 0 2px;user-select:none}
 .more summary::-webkit-details-marker{display:none}
 .more summary::before{content:"▸ "}
@@ -321,6 +324,7 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
       <button data-view="parlay">Parlay Builder</button>
       <button data-view="alerts">🔔 Alerts <span class="badge" id="bellBadge" style="display:none"></span></button>
       <button data-view="data">⊞ Data</button>
+      <button data-view="ext">🔒 Private</button>
     </div>
     <div class="seg" id="leagueSeg">
       <button data-lg="all" data-on="1">All</button>
@@ -405,7 +409,7 @@ const SIGNAL_WEIGHT={
   rank:1, newcoach:1, coachexp:1, primetime:1, keynumber:1, heat:1,
   domefade:1, neutral:1, chalk:1, ats:1, hotstreak:1, coldstreak:1, qbquestion:1,
   rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1,
-  unrfavfcs:1, dogimp10:1, lowlast:1, dog7to9:1, late4pm:1, bigfav:1
+  unrfavfcs:1, dogimp10:1, lowlast:1, dog7to9:1, late4pm:1, bigfav:1, external:1
 };
 const STACK_STRONG_AT=4;
 /* NFL head coaches for the 2026 season: {TEAM:[name, yearsAsHeadCoach]}.
@@ -863,6 +867,8 @@ function playProb(cats,lg){
   return {p:Math.round(p*10)/10,src:list[0].src,n:list.length};
 }
 const WEEKLY_EXPOSURE_CAP=0.15;   // of bankroll, across every open bet on the board
+const MAX_BETS=12;                // only the top plays by estimated edge get a stake; the rest stay "strong, no stake"
+let betCut=new Set();             // keys `${gameId}|${dir}` inside this week's cut
 let exposureFactor=1;             // recomputed each render from the raw Kelly stakes
 function rawKelly(p,odds){
   const b=americanToDecimal(odds||-110)-1, q=p/100;
@@ -870,10 +876,13 @@ function rawKelly(p,odds){
   return f>0?f*KELLY_FRACTION:0;
 }
 function recomputeExposure(){
-  let sum=0;
-  state.games.filter(g=>g.state!=="post").forEach(g=>{ const b=bestPlayRaw(g); if(b) sum+=rawKelly(b.p,-110); });
+  const cands=[];
+  state.games.filter(g=>g.state!=="post").forEach(g=>{ const b=bestPlayRaw(g); if(b) cands.push({key:`${g.id}|${b.dir}`,p:b.p,n:b.cats.length}); });
+  cands.sort((a,b)=>b.p-a.p||b.n-a.n);
+  betCut=new Set(cands.slice(0,MAX_BETS).map(c=>c.key));
+  let sum=0; cands.slice(0,MAX_BETS).forEach(c=>{ sum+=rawKelly(c.p,-110); });
   exposureFactor=sum>WEEKLY_EXPOSURE_CAP?WEEKLY_EXPOSURE_CAP/sum:1;
-  return {sum,factor:exposureFactor};
+  return {sum,factor:exposureFactor,total:cands.length,cut:Math.min(MAX_BETS,cands.length)};
 }
 function kellyStake(p,odds){
   const b=americanToDecimal(odds||-110)-1, q=p/100;
@@ -899,6 +908,7 @@ function bestPlay(g){
     const pr=playProb(cats,g.lg); if(!pr) return;
     if(!best||pr.p>best.p) best={dir,cats,p:pr.p,src:pr.src,lead:list[0],stake:kellyStake(pr.p,-110)};
   });
+  if(best&&betCut.size&&!betCut.has(`${g.id}|${best.dir}`)){ best.cut=true; best.stake={f:0,pct:0,dollars:0,capped:false,cut:true}; }
   return best;
 }
 // Format the number a call is on: totals carry the total, sides carry THEIR spread.
@@ -916,9 +926,9 @@ function callBox(g){
   const b=bestPlay(g);
   if(b){
     const num=callNumber(g,b.dir,live);
-    const stake=b.stake.dollars>0?`$${b.stake.dollars} <span class="cb3">(${b.stake.pct}% of $${state.bankroll}, ¼-Kelly)</span>`:`no stake <span class="cb3">(est. under break-even)</span>`;
-    return `<div class="callbox bet${live?" live":""}">
-      <div class="cb1">▶ ${live?"LIVE BET":"BET"}: ${num}</div>
+    const stake=b.cut?`no stake <span class="cb3">(strong, but outside this week's top ${MAX_BETS} by edge)</span>`:(b.stake.dollars>0?`$${b.stake.dollars} <span class="cb3">(${b.stake.pct}% of $${state.bankroll}, ¼-Kelly)</span>`:`no stake <span class="cb3">(est. under break-even)</span>`);
+    return `<div class="callbox ${b.cut?"strongcut":"bet"}${live?" live":""}">
+      <div class="cb1">${b.cut?"◆ STRONG":"▶ "+(live?"LIVE BET":"BET")}: ${num}</div>
       <div class="cb2"><b>${stake}</b> · <b>${b.p}%</b> est. hit rate</div>
       <div class="cb2">Because: ${b.lead.play}${b.cats.length>1?` + ${b.cats.length-1} more signal${b.cats.length>2?"s":""} agreeing`:""}</div>
     </div>`;
@@ -959,6 +969,65 @@ function updateBell(){
   const seen=lsGet("edgeboard-alerts-seen",0);
   const n=lsGet("edgeboard-alerts-v1",[]).filter(a=>a.ts>seen).length;
   b.textContent=n?String(n):""; b.style.display=n?"":"none";
+}
+/* ================= PRIVATE EXTERNAL PICKS =================
+   Picks from an outside source the owner has access to, pasted in by hand (or later
+   pulled from a feed they control). Stored ONLY in this browser's localStorage — it is
+   never sent anywhere and never visible to anyone else who opens the board. The board
+   matches each pick to a game, shows a locked chip, adds a lean-only "external" signal,
+   and grades the source over time through the normal Results tracking. */
+const EXT_MIN_SCORE=40;    // owner's guidance: below this the source's own confidence isn't worth counting
+function extPicks(){ return lsGet("edgeboard-ext-v1",[]); }
+function parseExtLines(text){
+  const abs=new Set(); state.games.forEach(g=>{ abs.add(g.home.ab.toUpperCase()); abs.add(g.away.ab.toUpperCase()); });
+  const out=[], bad=[];
+  text.split(/\n+/).map(l=>l.trim()).filter(Boolean).forEach(line=>{
+    if(/^#/.test(line)) return;
+    const toks=line.replace(/,/g," ").split(/\s+/);
+    let team=null,type=null,dir=null,num=null,score=null;
+    toks.forEach((t,i)=>{
+      const T=t.toUpperCase();
+      if(!team&&abs.has(T)) team=T;
+      else if(/^(OVER|UNDER|O|U)$/.test(T)&&toks[i+1]&&/^\d+(\.\d)?$/.test(toks[i+1])){ type="total"; dir=T[0]==="O"?"OVER":"UNDER"; num=parseFloat(toks[i+1]); }
+      else if(/^[+-]\d+(\.\d)?$/.test(T)&&type!=="total"){ type="spread"; num=parseFloat(T); }
+      else if(/^(ML|MONEYLINE)$/.test(T)){ type="ml"; }
+      else if(/^H?\d{1,3}$/.test(T)&&(i>0)&&(num!=null||type==="ml"||i===toks.length-1)){ const v=parseInt(T.replace(/^H/,""),10); if(v>=0&&v<=100) score=v; }
+    });
+    if(!team){ bad.push(line); return; }
+    if(type==="spread"||type==="ml"||!type) dir=team;
+    out.push({team,type:type||"side",dir,num,score,raw:line,ts:Date.now()});
+  });
+  return {out,bad};
+}
+function extFor(g){
+  const P=extPicks(); const H=g.home.ab.toUpperCase(), A=g.away.ab.toUpperCase();
+  return P.filter(p=>p.team===H||p.team===A);
+}
+function extEdges(g){
+  const E=[]; extFor(g).forEach(p=>{
+    const dir=p.type==="total"?p.dir:(p.team===g.home.ab.toUpperCase()?g.home.ab:g.away.ab);
+    const weak=p.score!=null&&p.score<EXT_MIN_SCORE;
+    E.push({k:"lean",dir:weak?null:dir,cat:"external",ext:true,play:`🔒 Outside source: ${p.type==="total"?`${p.dir} ${p.num}`:`${dir}${p.num!=null?" "+(p.num>0?"+":"")+p.num:""}`}${p.score!=null?` (score ${p.score})`:""}`,
+      why:`A pick from your private outside source${p.score!=null?`, confidence score ${p.score}${weak?` — below your ${EXT_MIN_SCORE} floor, so it's shown but not counted`:""}`:""}. Lean-only until the board has graded enough of these to know their real hit rate — that shows up in Results under <b>external</b>. Visible on this device only.`});
+  });
+  return E;
+}
+function renderExt(){
+  const box=document.getElementById("board");
+  const P=extPicks(); const matched=P.filter(p=>state.games.some(g=>g.home.ab.toUpperCase()===p.team||g.away.ab.toUpperCase()===p.team));
+  box.innerHTML=`<div class="note"><b>🔒 Private layer — this device only.</b> Paste picks from an outside source you have access to, one per line. The board matches them to this week's games, shows a locked chip on the card, and adds a lean-only <b>external</b> signal. Nothing here leaves your browser: it isn't sent to the server, isn't in the export unless you include it, and nobody else opening this board can see it. Over time Results will show the source's real hit rate on your slate.
+    <br><br>Formats: <span class="mono">UTEP +40.5 62</span> · <span class="mono">MIZ -55.5</span> · <span class="mono">RUTG UNDER 55.5 H48</span> · <span class="mono">OU ML 71</span> — team, the play, optional confidence score (0–100; under ${EXT_MIN_SCORE} is shown but not counted).</div>
+    <textarea id="extText" rows="6" style="width:100%;box-sizing:border-box;background:var(--bg2);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;font-family:inherit" placeholder="One pick per line…"></textarea>
+    <div class="prow"><button class="tbtn" id="extAdd">Add picks</button><button class="tbtn" id="extClear">Clear all</button><span class="dim" id="extMsg" style="font-size:12px">${P.length} stored · ${matched.length} match this week's games</span></div>
+    ${P.length?`<div class="sech" style="margin-top:14px">Stored picks <span class="cnt">${P.length}</span></div>${P.slice().reverse().map(p=>`<div class="arow"><span class="catchip">${p.type}</span><div class="abody"><div class="atext">${p.team} ${p.type==="total"?`${p.dir} ${p.num}`:(p.num!=null?(p.num>0?"+":"")+p.num:"")}${p.score!=null?` · score ${p.score}${p.score<EXT_MIN_SCORE?" (below floor)":""}`:""}</div><div class="atime">${p.raw}</div></div></div>`).join("")}`:""}`;
+  document.getElementById("extAdd")?.addEventListener("click",()=>{
+    const {out,bad}=parseExtLines(document.getElementById("extText").value||"");
+    lsSet("edgeboard-ext-v1",[...extPicks(),...out]);
+    document.getElementById("extMsg").textContent=`${out.length} added${bad.length?` · ${bad.length} not understood: ${bad.slice(0,3).join(" | ")}`:""}`;
+    setTimeout(renderExt,900);
+  });
+  document.getElementById("extClear")?.addEventListener("click",()=>{ lsSet("edgeboard-ext-v1",[]); renderExt(); });
+  updateLive();
 }
 /* ================= DATA VIEW / EXPORT =================
    Everything the board computed, as a table you can sort and a file you can take
@@ -1191,9 +1260,10 @@ function fmtLine(v,homeAb,awayAb){
 // only the in-play signals.
 const WEATHER_CATS=new Set(["wind","precip","cold","heat"]);
 const CROSS_LEAGUE_CATS=new Set(["lowlast"]);   // measured positive in BOTH leagues, both seasons
-const LEAN_ONLY_CATS=new Set(["late4pm","dog7to9","fav10","bigfav","rank28","lowlast_cfb"]); // consistent but thin or mechanism-less: never strong
+const LEAN_ONLY_CATS=new Set(["late4pm","dog7to9","fav10","bigfav","rank28","lowlast_cfb","external"]); // consistent but thin or mechanism-less: never strong
 function edgesFor(g){
   const E=edgesForRaw(g);
+  if(g.state!=="in") E.push(...extEdges(g));
   // A forecast can never make a strong call by itself. Weather signals are the one
   // family that cannot be backtested here, so a weather "strong" must be backed by
   // an independent non-weather signal pointing the same way, or it's a lean.
@@ -1637,7 +1707,8 @@ function topPlays(limit){
       // support = distinct signal categories agreeing on this exact direction
       const cats=[...new Set(list.map(e=>e.cat))];
       const pr=playProb(cats,g.lg)||{p:0,src:"prior"};
-      rows.push({g,dir,cats,support:cats.length,lead:list[0],p:pr.p,src:pr.src,stake:kellyStake(pr.p,-110),
+      const inCut=betCut.has(`${g.id}|${dir}`);
+      rows.push({g,dir,cats,support:cats.length,lead:list[0],p:pr.p,src:pr.src,stake:inCut?kellyStake(pr.p,-110):{f:0,pct:0,dollars:0,capped:false,cut:true},
         kick:new Date(g.date)});
     });
   });
@@ -1646,7 +1717,7 @@ function topPlays(limit){
 }
 function renderTop(){
   const box=document.getElementById("board");
-  const rows=topPlays(12);
+  const rows=topPlays(30);
   if(!rows.length){
     // watch list: best LEANS by estimated hit rate — clearly not bets
     const leans=[];
@@ -1665,9 +1736,9 @@ function renderTop(){
     updateLive(); return;
   }
   const ex=recomputeExposure();
-  box.innerHTML=`<details class="note intro"><summary><b>What gets on this list</b></summary><div style="margin-top:8px">A play has to be <b>STRONG</b>. That means either one piece of hard evidence — a QB ruled out, 25+ mph gusts on a total, real line movement, a live pace gap — or several weighted signals agreeing to a score of 4+. Leans never qualify, no matter how many. Then the list is ranked by <b>estimated hit rate</b> (this board's own record once it has one, else the 2025 backtest, else a conservative default) and the stake is <b>quarter-Kelly</b> on your bankroll at -110. Break-even is 52.4%; at or under it, no stake. Estimates, capped at 60% — not promises. Stakes are reference only; nothing is placed. The week's open bets are capped at <b>${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll</b> combined, because ten plays from the same signal are not ten independent bets.</div></details>
+  box.innerHTML=`<details class="note intro"><summary><b>What gets on this list</b></summary><div style="margin-top:8px">A play has to be <b>STRONG</b>. That means either one piece of hard evidence — a QB ruled out, 25+ mph gusts on a total, real line movement, a live pace gap — or several weighted signals agreeing to a score of 4+. Leans never qualify, no matter how many. Then the list is ranked by <b>estimated hit rate</b> (this board's own record once it has one, else the 2025 backtest, else a conservative default) and the stake is <b>quarter-Kelly</b> on your bankroll at -110. Break-even is 52.4%; at or under it, no stake. Estimates, capped at 60% — not promises. Stakes are reference only; nothing is placed. Only the <b>top ${MAX_BETS} plays by estimated edge</b> get a stake each week — everything else strong is shown as "below the cut" — and those stakes together are capped at <b>${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll</b>, because a dozen plays from the same signal are not a dozen independent bets.</div></details>
     <div class="prow" style="align-items:center"><div class="pstake"><label>Bankroll $ <input type="number" id="bankrollInput" value="${state.bankroll}" min="0" step="50" style="width:100px"></label></div>
-      <span class="dim" style="font-size:12px">${ex.factor<1?`stakes scaled ×${ex.factor.toFixed(2)} — weekly cap of ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% reached`:`quarter-Kelly · weekly cap ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll`}</span></div>
+      <span class="dim" style="font-size:12px">${ex.cut} of ${ex.total} strong plays get a stake · ${ex.factor<1?`stakes scaled ×${ex.factor.toFixed(2)} (weekly ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% cap)`:`quarter-Kelly, under the ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% weekly cap`}</span></div>
     ${rows.map((r,i)=>`<div class="toprow">
       <div class="topnum">${i+1}</div>
       <div class="topbody">
@@ -1675,7 +1746,7 @@ function renderTop(){
         <div class="topgame">${r.g.name} · ${r.g.state==="in"?`LIVE ${r.g.away.score}–${r.g.home.score} ${r.g.short}`:fmtTime(r.g.date)} · because: ${r.lead.play}</div>
         <div class="topcats">${r.cats.map(c=>`<span class="catchip">${c}</span>`).join("")} <span class="srcnote">${r.src==="live"?"own record":r.src==="backtest"?"2025 backtest":"default prior"}</span></div>
       </div>
-      <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">${r.stake.dollars>0?`¼-Kelly $${r.stake.dollars}`:"no stake"}</div><div class="tsl">${r.support} signal${r.support===1?"":"s"}</div></div>
+      <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">${betCut.has(`${r.g.id}|${r.dir}`)?(r.stake.dollars>0?`¼-Kelly $${r.stake.dollars}`:"no stake"):"below the cut"}</div><div class="tsl">${r.support} signal${r.support===1?"":"s"}</div></div>
     </div>`).join("")}`;
   document.getElementById("bankrollInput")?.addEventListener("change",e=>{ state.bankroll=Math.max(0,Number(e.target.value)||0); lsSet("edgeboard-bankroll",state.bankroll); renderTop(); });
   updateLive();
@@ -2091,7 +2162,7 @@ function card(g){
   const live=g.state==="in";
   const ml=(v)=>v==null?"—":(typeof v==="number"?(v>0?"+"+v:v):v);
   const d=state.detail[g.id]||{};
-  const chips=E.filter(e=>!e.stacked&&!e.conflict).map(e=>`<span class="sig ${e.k}">${e.dir?`${e.dir} · `:""}${e.cat}</span>`).join("");
+  const chips=E.filter(e=>!e.stacked&&!e.conflict).map(e=>`<span class="sig ${e.k}${e.ext?" ext":""}">${e.ext?"🔒 ":""}${e.dir?`${e.dir} · `:""}${e.cat}</span>`).join("");
   return `<div class="card${strong?" hot":""}${live?" islive":""}">
     <div class="ctop">
       <div class="teams">
@@ -2122,6 +2193,7 @@ function render(){
   if(state.view==="track"){ renderTrackRecord(); return; }
   if(state.view==="alerts"){ renderAlerts(); return; }
   if(state.view==="data"){ renderData(); return; }
+  if(state.view==="ext"){ renderExt(); return; }
   if(state.view==="parlay"){ renderParlay(); return; }
   if(state.view==="top"){ renderTop(); return; }
   if(state.view==="props"){ renderProps(); return; }
@@ -2139,9 +2211,9 @@ function render(){
   }
   const sec=(t,list)=>list.length?`<div class="sech">${t} <span class="cnt">${list.length}</span></div><div class="lgrid">${list.map(card).join("")}</div>`:"";
   const strip=(()=>{
-    const open=gs.filter(g=>g.state!=="post"); const bets=open.map(g=>bestPlay(g)).filter(Boolean);
+    const open=gs.filter(g=>g.state!=="post"); const strongs=open.map(g=>bestPlay(g)).filter(Boolean); const bets=strongs.filter(b=>!b.cut);
     const stake=bets.reduce((a,b)=>a+(b.stake.dollars||0),0); const lv=open.filter(g=>g.state==="in").length;
-    return `<div class="strip"><div><b>${bets.length}</b> bet${bets.length===1?"":"s"}</div><div><b>$${stake}</b> total stake${exposureFactor<1?`<span class="cap">capped at ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll</span>`:""}</div><div><b>${lv}</b> live</div><div><b>${open.length-bets.length}</b> no-bet</div></div>`;
+    return `<div class="strip"><div><b>${bets.length}</b> bet${bets.length===1?"":"s"}${strongs.length>bets.length?`<span class="cap">+${strongs.length-bets.length} strong, no stake</span>`:""}</div><div><b>$${stake}</b> total stake${exposureFactor<1?`<span class="cap">capped at ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll</span>`:""}</div><div><b>${lv}</b> live</div><div><b>${open.length-bets.length}</b> no-bet</div></div>`;
   })();
   if(state.sort==="best"){
     // Best bets of the week: only games with a STRONG directional play, ranked by
@@ -2203,7 +2275,7 @@ document.getElementById("leagueSeg").addEventListener("click",e=>{const b=e.targ
 // intro stays open until it's been read once, then folds
 (()=>{ const el=document.getElementById("introNote"); if(!el) return; el.open=!lsGet("edgeboard-intro-read",0); el.addEventListener("toggle",()=>{ if(!el.open) lsSet("edgeboard-intro-read",1); }); })();
 // deep links: #top #props #results #parlay #alerts #data
-(()=>{ const h=String((typeof location!=="undefined"&&location.hash)||"").replace("#",""); const map={top:"top",props:"props",results:"track",track:"track",parlay:"parlay",alerts:"alerts",data:"data",board:"board"};
+(()=>{ const h=String((typeof location!=="undefined"&&location.hash)||"").replace("#",""); const map={top:"top",props:"props",results:"track",track:"track",parlay:"parlay",alerts:"alerts",data:"data",board:"board",ext:"ext",private:"ext"};
   if(map[h]){ state.view=map[h]; const seg=document.getElementById("viewSeg"); if(seg) [...seg.children].forEach(x=>x.dataset.on=(x.dataset.view===state.view)?"1":"0"); } })();
 document.getElementById("edgesOnly").addEventListener("change",e=>{state.edgesOnly=e.target.checked;render();});
 document.getElementById("betsOnly").addEventListener("change",e=>{state.betsOnly=e.target.checked;render();});
