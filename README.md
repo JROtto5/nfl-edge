@@ -25,29 +25,26 @@ those calls actually did.
   frozen, graded when the game goes final, with closing-line value, a per-signal
   self-audit, fade detection, and live covering/trailing status for open calls.
 
-## Backtests (2024 + 2025 seasons, real closing lines, 2,246 games)
+## Backtests (2023–2025, real closing lines, 3,371 games)
 
-Every rule is judged on two full seasons and must beat break-even (52.4%) in **each**
-season separately — the second season is out-of-sample for anything found on the first.
+Every rule is judged on three full seasons and must beat break-even (52.4%) in **each**
+season. Only three-for-three signals can make a strong call on their own.
 
-| Signal | NFL | College |
-|---|---|---|
-| Our ratings vs closer, 3+ pt gap, week 10+ | **57.8%** (58.5 / 57.1) | 51.3% — failed 2024, held at lean |
-| Ranked vs ranked → UNDER | — | **59.6%** (56.4 / 62.0) |
-| Unranked laying 21+ vs FCS → favorite | — | **58.4%** (57.8 / 58.9) |
-| Total 60+ → UNDER | — | **57.0%** (60.7 / 53.4) |
-| Dog implied ≤10 pts → OVER | — | **56.9%** (55.8 / 57.8) |
-| Either team's last game ≤30 combined → OVER | **58.3%** (57.1 / 59.4) | 54.9% (lean) |
-| Dog +7 to +9.5 | **61.4%** (65.8 / 57.8), lean-capped | — |
-| Favorites of 10+ | 58.0% (57.9 / 58.1), lean-capped | — |
-| 4pm Sunday window → OVER | 57.9% (57.6 / 58.2), lean-capped, no mechanism | — |
-| Ranked laying 28+ vs unranked FBS → dog | — | 53.8% — **62% in 2025, 43% in 2024**, demoted |
-| Team held to ≤7 last game | 50.8% (33 / 69) removed | 52.8% (47 / 58) removed |
-| Fade the rested college team | — | 52.3% (47 / 58) removed |
-| Primetime dog | 47.1% (37 / 57) removed | 48.0% |
-| Home dogs / divisional under / always-over CFB / revenge games | coin flips | coin flips |
+| Signal | NFL | College | Status |
+|---|---|---|---|
+| Our ratings vs closer, 3+ pt gap, week 10+ | **56.5%** (54 / 59 / 57) | 50.4% | NFL strong; CFB held at lean |
+| Total 60+ → UNDER | — | **56.1%** (55 / 61 / 53) | strong |
+| Dog implied ≤10 pts → OVER | — | **56.0%** (54 / 56 / 58) | strong |
+| Both teams' last game went UNDER → OVER | **58.4%** (55 / 59 / 63) | 53.6% | not live yet |
+| Favorites of 10+ | 56.2% (52 / 58 / 58) | — | lean (thin) |
+| Ranked vs ranked → UNDER | — | 56.7% (51 / 56 / 62) | lean |
+| Unranked laying 21+ vs FCS → favorite | — | 53.1% (**43** / 58 / 59) | lean |
+| Dog +7 to +9.5 | 57.5% (49 / 66 / 58) | — | lean |
+| Ranked laying 28+ vs FBS → dog | — | 53.0% (51 / 43 / 62) | lean |
+| Primetime dog, 4pm over, held-to-≤7, rested-team fade, total ≤45 under | one-season wonders | | removed |
+| Home dogs, always-over, divisional under, revenge, rest | coin flips | coin flips | not signals |
 
-114 rule×league tests were run ("the wall"); every result, including the failures, is
+117 rule×league tests were run ("the wall"); every result, including the failures, is
 shown in the app's Results → Advanced section. Weather signals cannot be backtested
 (ESPN strips forecasts from finished games) and can never make a strong call alone.
 

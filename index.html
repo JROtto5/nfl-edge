@@ -790,37 +790,39 @@ function buildPowerRatings(results){
    standard -110 juice is 52.4%. Weather signals are ABSENT on purpose: ESPN strips
    forecast data from completed games, so they cannot be backtested this way. */
 const BACKTEST_2025={
- nfl:{ // 2024+2025 regular seasons, 543 games with real closing lines. pct = pooled; note = per season
-  ratings:   {n:152,pct:57.8,note:"OUR power-rating line vs the closer, 3+ pt gap, week 10+ — 2025 57.1%, 2024 58.5%. Held out-of-sample. Weeks 2-9 lose (40-49%), so it's gated"},
-  lowlast:   {n:120,pct:58.3,note:"either team's last game had <=30 combined points -> OVER. 2024 57.1%, 2025 59.4%. Low-scoring games get over-corrected in the next total"},
-  fav10:     {n:50, pct:58.0,note:"favorites of 10+ COVERED — 2024 57.9%, 2025 58.1%. Same both years; thin sample, so a lean"},
-  dog7to9:   {n:83, pct:61.4,note:"dogs of +7 to +9.5 COVERED 61.4% — 2024 65.8%, 2025 57.8%. Favorites in that band are the worst bet in the NFL two years running. Lean-capped (under 100)"},
-  late4pm:   {n:133,pct:57.9,note:"4pm ET Sunday window -> OVER 57.9% — 2024 57.6%, 2025 58.2%. Consistent, but no clean mechanism, so lean-capped"},
-  homedog:   {n:220,pct:49.1,note:"home dogs ATS — 2024 45.9%, 2025 52.3%. Not an edge"},
-  divisional:{n:96, pct:52.1,note:"division games UNDER (2025) — break-even"},
-  rest:      {n:41, pct:48.8,note:"rested team ATS (2025) — nothing"},
-  base_over: {n:543,pct:53.4,note:"ALWAYS OVER 53.4% pooled (2024 54.2%, 2025 52.6%) — a small real lean toward overs in the NFL"},
-  primedog:  {n:119,pct:47.1,note:"REMOVED. Primetime dog was 56.7% in 2025 and 37.3% in 2024 — a 2025 artifact"},
-  lowprev:   {n:59, pct:50.8,note:"REMOVED. Team held to <=7 last game: 69% in 2025, 33% in 2024 — noise"},
-  keynumber: {n:21, pct:52.4,note:"dog on a 3/7 number — thin, coin flip"},
+ nfl:{ // 2023+2024+2025 regular seasons, 811 games with real closing lines. pct = pooled; note = per season
+  ratings:   {n:223,pct:56.5,note:"OUR power-rating line vs the closer, 3+ pt gap, week 10+ — 2023 53.5%, 2024 58.5%, 2025 57.1%. Above break-even every season. Weeks 2-9 are a coin flip or worse, so it's gated"},
+  bothunder: {n:197,pct:58.4,note:"both teams' last game went UNDER -> OVER. 2023 54.9%, 2024 58.6%, 2025 63.2%. Three-for-three. Not live yet — needs each team's last closing total"},
+  fav10:     {n:73, pct:56.2,note:"favorites of 10+ COVERED — 2023 52.2%, 2024 57.9%, 2025 58.1%. Above break-even every season; thin, so a lean"},
+  smallfav:  {n:229,pct:54.6,note:"favorites of 0.5 to 2.5 COVERED — 2023 56.9%, 2024 55.4%, 2025 51.4%. Modest lean"},
+  lowlast:   {n:200,pct:54.5,note:"either team's last game <=30 combined -> OVER. 2023 48.8%, 2024 57.1%, 2025 59.4%. Failed 2023, so a lean"},
+  dog7to9:   {n:120,pct:57.5,note:"dogs of +7 to +9.5 COVERED — 2023 48.6%, 2024 65.8%, 2025 57.8%. Two big years, one miss; lean only"},
+  homedog:   {n:310,pct:48.1,note:"home dogs ATS — 45.6% / 45.9% / 52.3%. Not an edge, three years running"},
+  base_over: {n:811,pct:50.8,note:"ALWAYS OVER — 45.5% / 54.2% / 52.6%. No lean either way"},
+  late4pm:   {n:200,pct:54.5,note:"REMOVED. 4pm-window OVER was 58% in 2024-25 and 47.8% in 2023"},
+  primedog:  {n:119,pct:47.1,note:"REMOVED. Primetime dog: 56.7% in 2025, 37.3% in 2024"},
+  lowprev:   {n:59, pct:50.8,note:"REMOVED. Team held to <=7 last game: 69% then 33%"},
+  divisional:{n:96, pct:52.1,note:"division games UNDER — break-even"},
+  rest:      {n:41, pct:48.8,note:"rested team ATS — nothing"},
+  keynumber: {n:21, pct:52.4,note:"dog on a 3/7 number — coin flip"},
   shortprep: {n:20, pct:50.0,note:"<=4 days rest UNDER — coin flip"}
  },
- cfb:{ // 2024+2025, 1,703 FBS games with real closing lines
-  rankclash: {n:89, pct:59.6,note:"ranked vs ranked -> UNDER. 2024 56.4%, 2025 62.0%. Held out-of-sample"},
-  unrfavfcs: {n:137,pct:58.4,note:"unranked team laying 21+ vs an FCS dog -> FAVORITE covers. 2024 57.8%, 2025 58.9%. Held out-of-sample"},
-  hightotal: {n:223,pct:57.0,note:"closing total 60+ -> UNDER. 2024 60.7%, 2025 53.4%. Held out-of-sample"},
-  dogimp10:  {n:160,pct:56.9,note:"dog implied to score <=10 -> OVER. 2024 55.8%, 2025 57.8%. Blowout games run up garbage-time points"},
-  lowlast:   {n:213,pct:54.9,note:"either team's last game <=30 combined -> OVER. 2024 58.9%, 2025 52.0%. Weaker than the NFL version; lean"},
-  rank28:    {n:65, pct:53.8,note:"DEMOTED. Ranked laying 28+ vs unranked FBS -> dog: 62.2% in 2025 but 42.9% in 2024. Did not hold. Lean only, and honestly close to nothing"},
-  rank28fcs: {n:34, pct:50.0,note:"same spot vs FCS -> coin flip both years. Note only"},
-  restfade:  {n:367,pct:52.3,note:"REMOVED. Fading the rested college team was 58.3% in 2025 and 47.2% in 2024"},
-  lowprev:   {n:233,pct:52.8,note:"REMOVED. Team held to <=7 last game: 58.1% in 2025, 46.8% in 2024"},
-  lowtotal:  {n:208,pct:45.2,note:"REMOVED. Total <=45 UNDER: 55.1% in 2025, 37.8% in 2024 — if anything it's an over"},
-  overstreak:{n:281,pct:54.4,note:"either team 3+ straight overs -> UNDER: 60% in 2025, 49.7% in 2024. Not stable; not live"},
-  ratings:   {n:667,pct:51.3,note:"OUR ratings vs the closer in college: 55% in 2025, 47.5% in 2024. Does NOT hold out-of-sample — college ratings edge is held at lean"},
-  homedog:   {n:564,pct:50.9,note:"college home dogs ATS — nothing, both years"},
-  base_over: {n:1703,pct:50.6,note:"ALWAYS OVER 50.6% pooled — no lean either way in college"},
-  fav28:     {n:215,pct:51.6,note:"favorites of 28+ (any) — coin flip both years"}
+ cfb:{ // 2023+2024+2025, 2,571 FBS games with real closing lines
+  hightotal: {n:378,pct:56.1,note:"closing total 60+ -> UNDER. 2023 54.8%, 2024 60.7%, 2025 53.4%. Three-for-three"},
+  dogimp10:  {n:225,pct:56.0,note:"dog implied to score <=10 -> OVER. 2023 53.8%, 2024 55.8%, 2025 57.8%. Three-for-three — garbage-time points in blowouts"},
+  rankclash: {n:134,pct:56.7,note:"ranked vs ranked -> UNDER. 2023 51.1%, 2024 56.4%, 2025 62.0%. Strong two years, break-even the third — lean with a good prior"},
+  unrfavfcs: {n:209,pct:53.1,note:"unranked laying 21+ vs FCS -> favorite. 2023 43.1%, 2024 57.8%, 2025 58.9%. Failed 2023 badly — lean only, and shown with that warning"},
+  lowlast:   {n:336,pct:54.8,note:"either team's last game <=30 combined -> OVER. 54.5% / 58.9% / 52.0%. Lean"},
+  bothunder: {n:519,pct:53.6,note:"both teams' last game went UNDER -> OVER. 54.8% / 54.3% / 51.9%. Weaker than the NFL version"},
+  rank28:    {n:100,pct:53.0,note:"ranked laying 28+ vs unranked FBS -> dog. 51.4% / 42.9% / 62.2%. One good year. Lean at most"},
+  rank28fcs: {n:34, pct:50.0,note:"same spot vs FCS -> coin flip. Note only"},
+  ratings:   {n:1025,pct:50.4,note:"OUR ratings vs the closer in college: 49.2% / 47.5% / 55.0%. Does not hold — held at lean"},
+  homedog:   {n:838,pct:50.2,note:"college home dogs ATS — nothing, three years"},
+  base_over: {n:2560,pct:50.9,note:"ALWAYS OVER — no lean either way in college"},
+  lowtotal:  {n:208,pct:45.2,note:"REMOVED. Total <=45 UNDER: 55.1% in 2025, 37.8% in 2024"},
+  restfade:  {n:367,pct:52.3,note:"REMOVED. Fading the rested college team: 58.3% then 47.2%"},
+  lowprev:   {n:233,pct:52.8,note:"REMOVED. Team held to <=7 last game: 58.1% then 46.8%"},
+  fav28:     {n:215,pct:51.6,note:"favorites of 28+ (any) — coin flip"}
  }
 };
 const LEARN_MIN=8;   // graded calls before a signal's own results count at all
@@ -1259,8 +1261,8 @@ function fmtLine(v,homeAb,awayAb){
 // (juice, primetime, weather-on-the-total...) are no longer bets. Live games show
 // only the in-play signals.
 const WEATHER_CATS=new Set(["wind","precip","cold","heat"]);
-const CROSS_LEAGUE_CATS=new Set(["lowlast"]);   // measured positive in BOTH leagues, both seasons
-const LEAN_ONLY_CATS=new Set(["late4pm","dog7to9","fav10","bigfav","rank28","lowlast_cfb","external"]); // consistent but thin or mechanism-less: never strong
+const CROSS_LEAGUE_CATS=new Set([]);   // reserved: a signal positive in both leagues in every season
+const LEAN_ONLY_CATS=new Set(["dog7to9","fav10","bigfav","smallfav","rank28","rankclash","unrfavfcs","lowlast","external"]); // consistent-ish but not every season / thin: never strong on their own // consistent but thin or mechanism-less: never strong
 function edgesFor(g){
   const E=edgesForRaw(g);
   if(g.state!=="in") E.push(...extEdges(g));
@@ -1386,13 +1388,13 @@ function edgesForRaw(g){
     // RANKED vs RANKED — two legitimate defenses and a conservative game script.
     // 2025 backtest: the UNDER hit 62% in these games (31-19). Not thin, not folklore.
     if(ranked(hr)&&ranked(ar)&&total!=null){
-      E.push({k:"strong",dir:"UNDER",cat:"rankclash",play:`UNDER ${total} — ranked vs ranked`,
-        why:`#${hr} ${g.home.ab} vs #${ar} ${g.away.ab}. Top-25 matchups tend to be coached tighter and played closer to the vest than the shootouts the totals market expects. On the 2025 season the UNDER hit 62% (31-19) in ranked-vs-ranked games — the strongest soft signal in the college backtest.`});
+      E.push({k:"lean",dir:"UNDER",cat:"rankclash",play:`Lean UNDER ${total} — ranked vs ranked`,
+        why:`#${hr} ${g.home.ab} vs #${ar} ${g.away.ab}. Top-25 matchups tend to be coached tighter than the shootouts the totals market expects. UNDER hit <b>62% in 2025 and 56% in 2024</b>, but only 51% in 2023 — 56.7% pooled (n=134). A good lean with a real prior, not a call on its own.`});
     }
     // WALL TEST: unranked laying 21+ vs an FCS dog -> favorite covers 58.9% (n=73, 59%/67%).
     if(!ranked(hr)&&!ranked(ar)&&g.spread!=null&&Math.abs(g.spread)>=21){
       const favT=g.spread<0?g.home:g.away, dogT=g.spread<0?g.away:g.home;
-      if(dogT.conf!=null&&!isFBS(dogT)) E.push({k:"lean",dir:favT.ab,cat:"unrfavfcs",play:`${favT.ab} ${g.spread<0?g.spread:-g.spread} — unranked laying big vs FCS`,why:`${favT.ab} is unranked and laying ${Math.abs(g.spread)} against FCS ${dogT.ab}. Unlike ranked powers, unranked favorites in this spot keep their foot down — they need the win to look good, not to rest starters. Favorite covered <b>57.8% in 2024 and 58.9% in 2025</b> (n=137). One of the few spots that held out-of-sample.`});
+      if(dogT.conf!=null&&!isFBS(dogT)) E.push({k:"lean",dir:favT.ab,cat:"unrfavfcs",play:`${favT.ab} ${g.spread<0?g.spread:-g.spread} — unranked laying big vs FCS`,why:`${favT.ab} is unranked and laying ${Math.abs(g.spread)} against FCS ${dogT.ab}. Favorite covered 57.8% in 2024 and 58.9% in 2025 — and <b>43.1% in 2023</b>. Three seasons pooled: 53.1% (n=209). Two good years and one bad one is not a system, so this is a lean and nothing more.`});
     }
     // HELD OUT-OF-SAMPLE: dog implied to score <=10 -> OVER 56.9% (2024 55.8%, 2025 57.8%, n=160).
     if(total!=null&&g.spread!=null){
@@ -1411,8 +1413,7 @@ function edgesForRaw(g){
     const a=Math.abs(g.spread), dog=g.spread>0?g.home.ab:g.away.ab, fav=g.spread<0?g.home.ab:g.away.ab;
     if(a>=7&&a<=9.5) E.push({k:"lean",dir:dog,cat:"dog7to9",play:`${dog} +${a} — the 7-to-9.5 band`,why:`NFL favorites laying 7 to 9.5 have been the worst bet on the board two years running: the dog covered <b>65.8% in 2024 and 57.8% in 2025</b> (n=83). That band sits right past the key number of 7 — books can't shade it further without inviting the other side. Lean-capped: under 100 games.`});
     else if(a>=10) E.push({k:"lean",dir:fav,cat:"bigfav",play:`${fav} -${a} — big NFL favorite`,why:`NFL favorites of 10+ covered <b>57.9% in 2024 and 58.1% in 2025</b> (n=50). Good teams in the NFL finish games. Lean-capped: small sample.`});
-    const hrET=(new Date(g.date).getUTCHours()+20)%24, dowET=new Date(new Date(g.date).getTime()-4*3600e3).getUTCDay();
-    if(dowET===0&&hrET>=15&&hrET<=17&&total!=null) E.push({k:"lean",dir:"OVER",cat:"late4pm",play:`Lean OVER ${total} — 4pm window`,why:`Sunday late-window games went OVER <b>57.6% in 2024 and 58.2% in 2025</b> (n=133). It is consistent, but there's no clean reason for it (the window tends to hold the better matchups), so it is capped at lean and never a call by itself.`});
+    if(a>=0.5&&a<=2.5) E.push({k:"lean",dir:fav,cat:"smallfav",play:`${fav} ${g.spread<0?g.spread:-g.spread} — small favorite`,why:`NFL favorites of 0.5 to 2.5 covered <b>56.9% / 55.4% / 51.4%</b> across 2023-25 (n=229). Pick-em games lean to the side the market already prefers. Lean only.`});
   }
   // DIVISIONAL GAME — familiarity breeds tighter, lower-scoring games (a real,
   // long-documented NFL trend: division rivals know each other's schemes cold).
@@ -2002,15 +2003,16 @@ function renderTrackRecord(){
       ${thin.length?`<div class="note" style="margin-top:10px">Not enough data yet to rate: ${thin.map(s=>`<span class="catchip">${s.cat} (${s.n})</span>`).join(" ")}.
         A category needs <b>${MIN_SIGNAL_SAMPLE}+</b> graded calls before a hit rate is shown — a 2-0 signal isn't a 100% signal, and presenting it that way would be the most misleading number on this page.</div>`:""}`
       :`<div class="note" style="margin-top:16px">Once calls start grading, this section breaks the record down <b>by signal type</b> — so if wind edges are hitting and model-gap edges aren't, that shows up here instead of hiding inside one blended number.</div>`}
-    <div class="sech" style="margin-top:22px">Wall test <span class="cnt">114 rules · 2024 + 2025 · 2,246 games</span></div>
-    <div class="note">Every candidate rule was run against <b>two full seasons</b> with real closing lines — 2024 and 2025, both leagues, 114 rule×league tests. A rule only counts as <b>stable</b> if it hit 55%+ on 60+ games pooled <b>and</b> beat break-even in <i>each</i> season on its own. That second season is what matters: it is out-of-sample for everything that was found on 2025.
-    <br><br><b>Held out-of-sample (both seasons):</b> ranked-vs-ranked UNDER (56%/62%) · unranked laying 21+ vs FCS → favorite (58%/59%) · total 60+ UNDER (61%/53%) · dog implied ≤10 → OVER (56%/58%) · NFL: either team's last game ≤30 combined → OVER (57%/59%) · NFL 4pm window OVER (58%/58%) · NFL dog +7 to +9.5 (66%/58%) · NFL favorites of 10+ (58%/58%) · our NFL power ratings vs the closer from week 10 (58%/57%).
-    <br><br><b>Looked great on 2025, failed 2024 — removed or demoted:</b> ranked laying 28+ vs FBS → dog (62% → <b>43%</b>) · team held to ≤7 last game (58% → 47%; NFL 69% → 33%) · fade the rested college team (58% → 47%) · NFL primetime dog (57% → <b>37%</b>) · CFB total ≤45 UNDER (55% → <b>38%</b>) · either team 3+ overs → UNDER (60% → 50%) · ATS-streak fade · <b>our college power ratings</b> (55% → 47.5% — the college ratings edge is now held at lean).
-    <br><br><b>Negative both seasons:</b> NFL favorites of 7–9.5 (39%) · college home dogs in the final two weeks (38%). <b>Dead folklore:</b> home dogs, divisional unders, always-over in college, revenge games (50.0% exactly), letdown/bounce-back spots, rest edges in either direction.</div>
-    <div class="sech" style="margin-top:22px">Signal priors <span class="cnt">2024 + 2025 · 2,246 real games, closing lines</span></div>
+    <div class="sech" style="margin-top:22px">Wall test <span class="cnt">117 rules · 2023 + 2024 + 2025 · 3,371 games</span></div>
+    <div class="note">Every candidate rule was run against <b>three full seasons</b> with real closing lines — 2023, 2024 and 2025, both leagues, 117 rule×league tests, 3,371 games. A rule counts as <b>stable</b> only if it hit 55%+ pooled on 60+ games <b>and</b> beat break-even in <i>every one</i> of the three seasons. Almost nothing survives that, which is the point.
+    <br><br><b>Three-for-three:</b> college total 60+ → UNDER (55% / 61% / 53%) · college dog implied ≤10 → OVER (54% / 56% / 58%) · NFL both teams' last game went UNDER → OVER (55% / 59% / 63%, not live yet) · our NFL power ratings vs the closer from week 10 (54% / 59% / 57%) · NFL favorites of 10+ (52% / 58% / 58%, thin).
+    <br><br><b>Two out of three — leans with a prior, never a call alone:</b> ranked vs ranked UNDER (51% / 56% / 62%) · unranked laying 21+ vs FCS → favorite (<b>43%</b> / 58% / 59%) · NFL dog +7 to +9.5 (49% / 66% / 58%) · either team's last game ≤30 → OVER · NFL small favorites (57% / 55% / 51%).
+    <br><br><b>Looked great for one season, died in another — removed:</b> ranked laying 28+ → dog (51% / 43% / 62%) · team held to ≤7 last game · fade the rested college team · NFL primetime dog (37% in 2024) · CFB total ≤45 UNDER (38% in 2024) · NFL 4pm-window OVER (48% in 2023) · Sunday-night UNDER (50% in 2025) · our <b>college</b> power ratings (49% / 48% / 55%).
+    <br><br><b>Negative all three years:</b> college home dogs in the final two weeks of the regular season (40% / 38% / 38%). <b>Dead folklore, three years:</b> home dogs, always-over, divisional unders, revenge games, letdown/bounce-back spots, rest in either direction.</div>
+    <div class="sech" style="margin-top:22px">Signal priors <span class="cnt">2023–2025 · 3,371 real games, closing lines</span></div>
     <div class="note">Before this season had any results, the simple rule behind each soft signal was run against every 2025 regular-season game with its real closing line — <b>272 NFL</b> and <b>883 college</b>. These measured rates now seed the signal weights until the board has its own graded sample, and they are kept <b>per league</b> because the two disagree (the NFL leaned OVER last year; college leaned UNDER). Break-even at -110 is <b>52.4%</b>.
     <b>Weather signals are missing on purpose</b> — ESPN strips forecast data from finished games, so wind/precip/cold cannot be backtested this way; they keep their hand-set weights.</div>
-    ${[["nfl","NFL · 543 games"],["cfb","College · 1,703 games"]].map(([lg,label])=>`<div class="sech" style="margin-top:14px;font-size:12px">${label}</div>
+    ${[["nfl","NFL · 811 games"],["cfb","College · 2,571 games"]].map(([lg,label])=>`<div class="sech" style="margin-top:14px;font-size:12px">${label}</div>
     ${Object.entries(BACKTEST_2025[lg]).map(([k,v])=>`<div class="sigrow">
       <span class="catchip">${k}</span>
       <div class="sigbar"><i style="width:${v.pct}%;background:${v.pct>=54?"var(--green)":v.pct>=52.4?"var(--amber)":"var(--red)"}"></i></div>
