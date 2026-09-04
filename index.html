@@ -167,6 +167,28 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .whyd[open] summary::before{content:"▾ "}
 .sc{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:22px;font-weight:800;margin-left:auto;padding-left:10px}
 .clk{font-size:14px;font-weight:700;color:var(--ink)}
+.sigs{display:flex;flex-wrap:wrap;gap:5px}
+.sig{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);color:var(--dim);background:var(--bg2);letter-spacing:.02em}
+.sig.strong{border-color:var(--green);color:var(--green);font-weight:700}
+.more summary{font-size:12px;color:var(--dim);cursor:pointer;list-style:none;padding:6px 0 2px;user-select:none}
+.more summary::-webkit-details-marker{display:none}
+.more summary::before{content:"▸ "}
+.more[open] summary::before{content:"▾ "}
+.more summary .dim{font-weight:400}
+.more>*+*{margin-top:8px}
+.lv{color:var(--amber);font-weight:700}
+.strip{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.strip>div{flex:1 1 120px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:12.5px;color:var(--dim);text-align:center}
+.strip b{display:block;font-size:22px;color:var(--ink);font-family:"JetBrains Mono",ui-monospace,monospace}
+.tscroll{overflow-x:auto;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
+.dtable{border-collapse:collapse;width:100%;font-size:12.5px;white-space:nowrap}
+.dtable th{position:sticky;top:0;background:var(--bg2);text-align:left;padding:9px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);cursor:pointer;border-bottom:1px solid var(--line)}
+.dtable th.on{color:var(--ink)}
+.dtable td{padding:8px 10px;border-bottom:1px solid var(--line)}
+.dtable tr.hasbet td.call{color:var(--green);font-weight:800}
+.dtable td.signals{max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.pos{color:var(--green)} .neg{color:var(--red)}
+.dim{color:var(--dim)}
 .badge{background:var(--red);color:#fff;border-radius:9px;font-size:10px;font-weight:800;padding:1px 6px;margin-left:3px;vertical-align:middle}
 .arow{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:8px}
 .arow.unread{border-color:var(--amber)}
@@ -292,6 +314,7 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
       <button data-view="track">Results</button>
       <button data-view="parlay">Parlay Builder</button>
       <button data-view="alerts">🔔 Alerts <span class="badge" id="bellBadge" style="display:none"></span></button>
+      <button data-view="data">⊞ Data</button>
     </div>
     <div class="seg" id="leagueSeg">
       <button data-lg="all" data-on="1">All</button>
@@ -896,6 +919,55 @@ function updateBell(){
   const n=lsGet("edgeboard-alerts-v1",[]).filter(a=>a.ts>seen).length;
   b.textContent=n?String(n):""; b.style.display=n?"":"none";
 }
+/* ================= DATA VIEW / EXPORT =================
+   Everything the board computed, as a table you can sort and a file you can take
+   somewhere else — a spreadsheet, another model, another AI. */
+function dataRows(){
+  return state.games.map(g=>{
+    let p={}; try{ p=projectLine(g)||{}; }catch(e){}
+    const b=bestPlay(g); const E=edgesFor(g).filter(e=>!e.stacked&&!e.conflict); const live=g.state==="in"; const d=state.detail[g.id]||{};
+    const r1=v=>v==null?null:Math.round(v*10)/10;
+    return {kick:g.date, league:g.lg, game:g.name, status:live?`LIVE ${g.short||""}`:(g.state==="post"?"FINAL":"pre"),
+      score:g.state!=="pre"?`${g.away.score??""}-${g.home.score??""}`:"",
+      spread:g.spread??d.preSpread??null, total:g.total??d.preTotal??null, liveSpread:d.liveSpread??null, liveTotal:d.liveTotal??null,
+      ourSpread:r1(p.spread), ourTotal:r1(p.total), spreadEdge:p.spreadEdge??null, totalEdge:p.totalEdge??null,
+      call:b?callNumber(g,b.dir,live):"", hitPct:b?b.p:null, stake:b?b.stake.dollars:null,
+      strong:E.filter(e=>e.k==="strong").length, leans:E.filter(e=>e.k==="lean").length,
+      signals:E.map(e=>`${e.k==="strong"?"!":""}${e.cat}${e.dir?":"+e.dir:""}`).join(" "),
+      gust:d.gust??null, temp:d.temp??g.temp??null, precip:d.precip??null, indoor:!!(d.indoor||g.indoor)};
+  });
+}
+function toCSV(rows){
+  if(!rows.length) return "";
+  const keys=Object.keys(rows[0]); const esc=v=>{ if(v==null) return ""; const t=String(v); return /[",\n]/.test(t)?`"${t.replace(/"/g,'""')}"`:t; };
+  return [keys.join(","),...rows.map(r=>keys.map(k=>esc(r[k])).join(","))].join("\n");
+}
+function downloadText(name,text,type){
+  try{ const blob=new Blob([text],{type}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500); }catch(e){}
+}
+function exportBundle(){
+  return {exportedAt:new Date().toISOString(), week:document.getElementById("weekTxt")?.textContent||"", bankroll:state.bankroll,
+    games:dataRows(), results:lsGet("edgeboard-record-v1",[]), alerts:lsGet("edgeboard-alerts-v1",[]).slice(0,50), backtest2025:BACKTEST_2025,
+    readme:"games = every game on the board with market lines, our projected lines, the board's call, estimated hit rate (%), quarter-Kelly stake ($), and the signal list (! = strong). results = every strong call this device has logged, with frozen lines and grades. Signal weights come from live results, else 2025 backtests, else hand-set priors."};
+}
+const DATA_COLS=[["kick","Kick"],["game","Game"],["status","Status"],["score","Score"],["spread","Spread"],["total","Total"],["ourSpread","Our spread"],["ourTotal","Our total"],["spreadEdge","Edge (sp)"],["totalEdge","Edge (tot)"],["call","Call"],["hitPct","Hit %"],["stake","Stake $"],["signals","Signals"]];
+function renderData(){
+  const box=document.getElementById("board");
+  let rows=dataRows();
+  if(state.league!=="all") rows=rows.filter(r=>r.league===state.league);
+  const {key,dir}=state.dataSort||{key:"kick",dir:1};
+  rows.sort((a,b)=>{ const x=a[key],y=b[key]; if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return (x<y?-1:x>y?1:0)*dir; });
+  const fmt=(k,v)=>{ if(v==null||v==="") return "—"; if(k==="kick") return fmtTime(v); if(k==="stake") return `$${v}`; if(k==="hitPct") return `${v}%`; if(k==="signals") return `<span class="dim">${v}</span>`; if((k==="spreadEdge"||k==="totalEdge")&&typeof v==="number") return `<b class="${v>0?"pos":"neg"}">${v>0?"+":""}${v}</b>`; return v; };
+  box.innerHTML=`<div class="note"><b>Every number the board computed</b>, one row per game. Tap a column to sort. Export takes the whole thing — market lines, our projected lines, calls, stakes, signals, your logged results and the 2025 backtests — as CSV (spreadsheet) or JSON (hand it to another model or AI and ask it what it sees).</div>
+    <div class="prow"><button class="tbtn" id="expCsv">⬇ CSV</button><button class="tbtn" id="expJson">⬇ JSON (full bundle)</button><button class="tbtn" id="copyJson">📋 Copy JSON</button><span class="dim" id="copyMsg"></span></div>
+    <div class="tscroll"><table class="dtable"><thead><tr>${DATA_COLS.map(([k,l])=>`<th data-sortkey="${k}" class="${key===k?"on":""}">${l}${key===k?(dir>0?" ▲":" ▼"):""}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map(r=>`<tr class="${r.call?"hasbet":""}">${DATA_COLS.map(([k])=>`<td class="${k}">${fmt(k,r[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  box.querySelectorAll("th[data-sortkey]").forEach(th=>th.addEventListener("click",()=>{ const k=th.dataset.sortkey; const cur=state.dataSort||{key:"kick",dir:1}; state.dataSort={key:k,dir:cur.key===k?-cur.dir:1}; renderData(); }));
+  document.getElementById("expCsv")?.addEventListener("click",()=>downloadText("edge-board.csv",toCSV(dataRows()),"text/csv"));
+  document.getElementById("expJson")?.addEventListener("click",()=>downloadText("edge-board.json",JSON.stringify(exportBundle(),null,1),"application/json"));
+  document.getElementById("copyJson")?.addEventListener("click",()=>{ const t=JSON.stringify(exportBundle()); (navigator.clipboard?.writeText(t)||Promise.reject()).then(()=>{document.getElementById("copyMsg").textContent="copied";},()=>{document.getElementById("copyMsg").textContent="copy failed — use ⬇ JSON";}); });
+  updateLive();
+}
 function renderAlerts(){
   const box=document.getElementById("board");
   const list=lsGet("edgeboard-alerts-v1",[]);
@@ -1076,8 +1148,18 @@ function fmtLine(v,homeAb,awayAb){
 // Once a game is underway every pregame market is closed, so pregame signals
 // (juice, primetime, weather-on-the-total...) are no longer bets. Live games show
 // only the in-play signals.
+const WEATHER_CATS=new Set(["wind","precip","cold","heat"]);
 function edgesFor(g){
   const E=edgesForRaw(g);
+  // A forecast can never make a strong call by itself. Weather signals are the one
+  // family that cannot be backtested here, so a weather "strong" must be backed by
+  // an independent non-weather signal pointing the same way, or it's a lean.
+  E.forEach(e=>{
+    if(e.k==="strong"&&WEATHER_CATS.has(e.cat)&&e.dir){
+      const backed=E.some(o=>o!==e&&o.dir===e.dir&&!WEATHER_CATS.has(o.cat));
+      if(!backed){ e.k="lean"; e.why+=` <b>Held at lean:</b> weather alone doesn't make a strong call on this board — it needs a second, non-weather signal agreeing.`; }
+    }
+  });
   return g.state==="in"?E.filter(e=>e.cat==="livepace"||e.cat==="livespread"):E;
 }
 function edgesForRaw(g){
@@ -1905,7 +1987,9 @@ function card(g){
   const strong=E.some(e=>e.k==="strong");
   const live=g.state==="in";
   const ml=(v)=>v==null?"—":(typeof v==="number"?(v>0?"+"+v:v):v);
-  return `<div class="card${strong?" hot":""}">
+  const d=state.detail[g.id]||{};
+  const chips=E.filter(e=>!e.stacked&&!e.conflict).map(e=>`<span class="sig ${e.k}">${e.dir?`${e.dir} · `:""}${e.cat}</span>`).join("");
+  return `<div class="card${strong?" hot":""}${live?" islive":""}">
     <div class="ctop">
       <div class="teams">
         <div class="tm${g.favAb===g.away.ab?" fav":""}">${g.away.logo?`<img src="${g.away.logo}" alt="">`:""}${rankTag(g.away.rank)}<span>${g.away.ab}</span>${recTag(g.away.rec)}${live||g.state==="post"?`<span class="sc">${g.away.score??""}</span>`:""}</div>
@@ -1914,23 +1998,26 @@ function card(g){
       <div class="when"><div class="st${live?" livegame":""}">${live?"● LIVE":(g.state==="post"?"FINAL":fmtTime(g.date))}</div>
         <div class="${live?"clk":""}">${live||g.state==="post"?g.short:(g.nextWeek?"next week":(g.venue||"").slice(0,26))}</div></div>
     </div>
+    ${callBox(g)}
     <div class="lines">
-      <div class="ln"><div class="l">Spread</div><div class="v">${g.details||"—"}${moveTag(g.moveSpread,"")}</div></div>
-      <div class="ln"><div class="l">Total</div><div class="v">${g.total??"—"}${moveTag(g.moveTotal,"")}</div></div>
+      <div class="ln"><div class="l">Spread</div><div class="v">${g.details||(live&&d.liveDetails?`<span class="lv">LIVE ${d.liveDetails}</span>`:"—")}${moveTag(g.moveSpread,"")}</div></div>
+      <div class="ln"><div class="l">Total</div><div class="v">${g.total??(live&&d.liveTotal!=null?`<span class="lv">LIVE ${d.liveTotal}</span>`:"—")}${moveTag(g.moveTotal,"")}</div></div>
       <div class="ln"><div class="l">ML ${g.away.ab}/${g.home.ab}</div><div class="v" style="font-size:11.5px">${ml(g.mlAway)} / ${ml(g.mlHome)}</div></div>
     </div>
-    ${callBox(g)}
-    ${projBlock(g)}
-    <div class="cond">${condPills(g)}</div>
-    ${E.length?`<div class="edges">${E.slice(0,4).map(e=>`
-      <div class="edge ${e.k}${e.stacked?" stacked":""}${e.conflict?" conflict":""}">${e.stacked?"🧱 ":""}${e.conflict?"⚠️ ":""}<span class="tag">${e.k==="strong"?"Strong":"Lean"}</span>
-        <div class="body"><div class="play">${e.play}</div><details class="whyd"><summary>why</summary><div class="why">${e.why}</div></details></div></div>`).join("")}</div>`
-      :`<div class="nodata">${(state.detail[g.id]||{}).got?"No strong edge — line looks fair for the conditions.":"Checking conditions…"}</div>`}
+    ${chips?`<div class="sigs">${chips}</div>`:(d.got?`<div class="nodata">No edge — line looks fair for the conditions.</div>`:`<div class="nodata"><span class="spin" style="width:9px;height:9px"></span> checking conditions…</div>`)}
+    <details class="more"><summary>Details <span class="dim">— projection, conditions, every signal</span></summary>
+      ${projBlock(g)}
+      <div class="cond">${condPills(g)}</div>
+      ${E.length?`<div class="edges">${E.slice(0,6).map(e=>`
+        <div class="edge ${e.k}${e.stacked?" stacked":""}${e.conflict?" conflict":""}">${e.stacked?"🧱 ":""}${e.conflict?"⚠️ ":""}<span class="tag">${e.k==="strong"?"Strong":"Lean"}</span>
+          <div class="body"><div class="play">${e.play}</div><details class="whyd"><summary>why</summary><div class="why">${e.why}</div></details></div></div>`).join("")}</div>`:""}
+    </details>
   </div>`;
 }
 function render(){
   if(state.view==="track"){ renderTrackRecord(); return; }
   if(state.view==="alerts"){ renderAlerts(); return; }
+  if(state.view==="data"){ renderData(); return; }
   if(state.view==="parlay"){ renderParlay(); return; }
   if(state.view==="top"){ renderTop(); return; }
   if(state.view==="props"){ renderProps(); return; }
@@ -1946,14 +2033,19 @@ function render(){
     updateLive(); return;
   }
   const sec=(t,list)=>list.length?`<div class="sech">${t} <span class="cnt">${list.length}</span></div><div class="lgrid">${list.map(card).join("")}</div>`:"";
+  const strip=(()=>{
+    const open=gs.filter(g=>g.state!=="post"); const bets=open.map(g=>bestPlay(g)).filter(Boolean);
+    const stake=bets.reduce((a,b)=>a+(b.stake.dollars||0),0); const lv=open.filter(g=>g.state==="in").length;
+    return `<div class="strip"><div><b>${bets.length}</b> bet${bets.length===1?"":"s"}</div><div><b>$${stake}</b> total stake</div><div><b>${lv}</b> live</div><div><b>${open.length-bets.length}</b> no-bet</div></div>`;
+  })();
   if(state.sort==="best"){
     // Best bets of the week: only games with a STRONG directional play, ranked by
     // that play's estimated hit probability. Games under BEST_MIN_PROB are listed
     // separately so a 52% "strong" never sits next to a 57% one as an equal.
     const rated=gs.map(g=>({g,b:bestPlay(g)})).filter(x=>x.b&&x.g.state!=="post").sort((a,b)=>b.b.p-a.b.p);
     const top=rated.filter(x=>x.b.p>=BEST_MIN_PROB).map(x=>x.g), rest=rated.filter(x=>x.b.p<BEST_MIN_PROB).map(x=>x.g);
-    box.innerHTML=rated.length?sec("🏆 Best bets of the week",top)+sec("Strong, but thin margin over break-even",rest)
-      :'<div class="empty">No strong directional play qualifies yet — check back as weather firms up and injury reports land.</div>';
+    box.innerHTML=strip+(rated.length?sec("🏆 Best bets of the week",top)+sec("Strong, but thin margin over break-even",rest)
+      :'<div class="empty">No strong directional play qualifies yet — check back as weather firms up and injury reports land.</div>');
     updateLive(); return;
   }
   if(state.sort==="time"){
@@ -1965,10 +2057,10 @@ function render(){
     });
     const buckets=new Map();
     gs.forEach(g=>{ const k=dayLabel(g.date,g.state); if(!buckets.has(k)) buckets.set(k,[]); buckets.get(k).push(g); });
-    box.innerHTML=[...buckets].map(([label,list])=>sec(label,list)).join("");
+    box.innerHTML=strip+[...buckets].map(([label,list])=>sec(label,list)).join("");
   } else {
     const nfl=gs.filter(g=>g.lg==="nfl"), cfb=gs.filter(g=>g.lg==="cfb");
-    box.innerHTML=sec("NFL",nfl)+sec("College Football",cfb);
+    box.innerHTML=strip+sec("NFL",nfl)+sec("College Football",cfb);
   }
   updateLive();
 }
@@ -1985,7 +2077,7 @@ function updateLive(){
 document.getElementById("viewSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
   state.view=b.dataset.view;[...e.currentTarget.children].forEach(x=>x.dataset.on=(x===b)?"1":"0");
   const boardOnly=state.view==="board";
-  document.getElementById("leagueSeg").style.display=boardOnly?"":"none";
+  document.getElementById("leagueSeg").style.display=(boardOnly||state.view==="data")?"":"none";
   document.getElementById("edgesOnly").closest("label").style.display=boardOnly?"":"none";
   document.getElementById("outdoorOnly").closest("label").style.display=boardOnly?"":"none";
   render();});
