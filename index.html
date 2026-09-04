@@ -404,7 +404,8 @@ const SIGNAL_WEIGHT={
   matchup:1, rest:1, shortweek:1, shortprep:1, divisional:1, homedog:1,
   rank:1, newcoach:1, coachexp:1, primetime:1, keynumber:1, heat:1,
   domefade:1, neutral:1, chalk:1, ats:1, hotstreak:1, coldstreak:1, qbquestion:1,
-  rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1
+  rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1,
+  lowprev:1, restfade:1, primedog:1, lowtotal:1, unrfavfcs:1
 };
 const STACK_STRONG_AT=4;
 /* NFL head coaches for the 2026 season: {TEAM:[name, yearsAsHeadCoach]}.
@@ -658,7 +659,9 @@ async function runQueue(){
           // A "recent form" read needs a real sample. Two games into a season the
           // averages swing wildly on one blowout, so pace/matchup stay silent until
           // there are MIN_FORM_GAMES current-season games to average over.
-          form[ab]={wins,of:curSeasonEvs.length,lastDate,streakLen:streak.length,streakType:streak[0]||null,
+          const lastEv=curSeasonEvs[curSeasonEvs.length-1];
+          const lastPf=lastEv?Number(lastEv.atVs==="vs"?lastEv.homeTeamScore:lastEv.awayTeamScore):null;
+          form[ab]={wins,of:curSeasonEvs.length,lastDate,lastPf:Number.isNaN(lastPf)?null:lastPf,streakLen:streak.length,streakType:streak[0]||null,
             avgFor:n>=MIN_FORM_GAMES?pf/n:null, avgAgainst:n>=MIN_FORM_GAMES?pa/n:null};
         });
         // against-the-spread trend — empty early season, populates as games are played;
@@ -791,6 +794,8 @@ const BACKTEST_2025={
   base_over: {n:272,pct:52.6,note:"ALWAYS OVER beat the vig last season — the board's weather lean is UNDER, so it fights the base rate"},
   fav10:     {n:31, pct:58.1,note:"favorites of 10+ COVERED 58% — do not blindly fade big NFL favorites"},
   ratings:   {n:70, pct:57.1,note:"OUR power-rating line vs the closer, 3+ pt disagreement, week 10+ (both teams 9+ games) — walk-forward, no lookahead"},
+  lowprev:   {n:29, pct:69.0,note:"WALL TEST: bet a team held to 7 or fewer points last game — 69% but thin; college agrees (58%), so it's live as a lean here"},
+  primedog:  {n:60, pct:56.7,note:"WALL TEST: primetime underdog ATS — 56.7%, both halves. College was the OPPOSITE (46%), so NFL-only and lean-capped"},
   ratings_early:{n:57,pct:40.4,note:"same rule weeks 2-9 — WORSE than a coin flip, which is why no NFL ratings edge is claimed before both teams have 9 games"},
   ratings_far:{n:56,pct:42.9,note:"disagree with the market by 6+ pts — LOSES; that far off, the market knows something we don't (capped, never bet)"}
  },
@@ -799,6 +804,12 @@ const BACKTEST_2025={
   rank28fcs: {n:19, pct:52.6,note:"same spot but the dog is FCS -> coin flip (46% in weeks 1-2). Not a play; shown as a note only"},
   rank:      {n:23, pct:43.5,note:"ranked laying 24-27.5 vs unranked -> dog covered only 43.5%. NEGATIVE — removed as a signal. (An earlier version leaned it off a 54.4% number that the 28+ games were propping up.)"},
   rankclash: {n:50, pct:62.0,note:"ranked vs ranked -> UNDER hit 62% — two real defenses, tighter game scripts"},
+  lowprev:   {n:124,pct:58.1,note:"WALL TEST: bet a team held to 7 or fewer points last game — 58.1% (60%/56% by half); the market over-punishes one bad offensive day. NFL agrees (69%, n=29)"},
+  restfade:  {n:168,pct:58.3,note:"WALL TEST: FADE the college team with 4+ more days of rest — 58.3% (55%/62%). Rest folklore is backwards in college; the rusty side loses ATS"},
+  lowtotal:  {n:89, pct:55.1,note:"WALL TEST: total 45 or lower -> UNDER 55.1% (55%/55%). Lean-capped (under 100 games)"},
+  unrfavfcs: {n:73, pct:58.9,note:"WALL TEST: unranked team laying 21+ vs an FCS dog -> FAVORITE covers 58.9% (59%/67%). Mirror image of rank28: the ranked team coasts, the unranked one doesn't. Lean-capped"},
+  overstreak:{n:130,pct:60.0,note:"WALL TEST (not live yet): either team's last 3 went OVER -> UNDER 60%. Needs past totals the live feed doesn't carry"},
+  atsstreak: {n:158,pct:55.7,note:"WALL TEST (not live yet): fade a team on a 3+ game ATS win streak -> 55.7% college, 59.6% NFL (n=52). Needs past spreads the live feed doesn't carry"},
   hightotal: {n:116,pct:53.4,note:"closing total 60+ -> UNDER 53.4% — big numbers slightly overshoot"},
   homedog:   {n:290,pct:50.0,note:"college home dogs ATS — dead coin flip, no edge at all"},
   base_over: {n:883,pct:49.3,note:"ALWAYS OVER did NOT work in college (49.3%) — opposite of the NFL, so the NFL over-lean is never applied here"},
@@ -1179,6 +1190,7 @@ function fmtLine(v,homeAb,awayAb){
 // (juice, primetime, weather-on-the-total...) are no longer bets. Live games show
 // only the in-play signals.
 const WEATHER_CATS=new Set(["wind","precip","cold","heat"]);
+const CROSS_LEAGUE_CATS=new Set(["lowprev"]);   // measured positive in BOTH leagues
 function edgesFor(g){
   const E=edgesForRaw(g);
   // A forecast can never make a strong call by itself. Weather signals are the one
@@ -1189,7 +1201,9 @@ function edgesFor(g){
     const pr=catProb(e.cat,g.lg);
     const st=pr.src==="live"?(state.learned||{})[e.cat]:(BACKTEST_2025[g.lg]||{})[e.cat];
     if(pr.src!=="prior"&&st&&st.n>=40){
-      if(e.k==="lean"&&pr.p>=55&&!WEATHER_CATS.has(e.cat)){ e.k="strong"; e.why+=` <b>Measured strong:</b> this signal hit ${pr.p}% on ${st.n} games (${pr.src==="live"?"this board's own record":"2025 backtest"}).`; }
+      // 100+ games to be promoted to strong, unless both leagues agree on the signal
+      const enough=st.n>=100||CROSS_LEAGUE_CATS.has(e.cat);
+      if(e.k==="lean"&&pr.p>=55&&enough&&!WEATHER_CATS.has(e.cat)){ e.k="strong"; e.why+=` <b>Measured strong:</b> this signal hit ${pr.p}% on ${st.n} games (${pr.src==="live"?"this board's own record":"2025 backtest"}).`; }
       if(e.k==="strong"&&pr.p<52.4){ e.k="lean"; e.why+=` <b>Held at lean:</b> measured at ${pr.p}% on ${st.n} games — below break-even, so it can't be a strong call.`; }
     }
   });
@@ -1262,10 +1276,17 @@ function edgesForRaw(g){
     // only trust this within a plausible in-season gap — a season opener's "last game"
     // is last year's finale, months back, and isn't a real rest/short-week signal.
     const inSeason=restDays>0&&restDays<=20;
-    if(inSeason&&restDays>=10) E.push({k:"lean",dir:t.ab,cat:"rest",play:`${t.ab} extra rest`,why:`${restDays} days since their last game (bye week or rescheduling). Backtested on 2025 the rested side covered just 48.8% — no measurable edge — so this is context, not a reason to bet.`});
+    const of=form[opp]; const oppRest=(of&&of.lastDate)?Math.round((gameDate-of.lastDate)/864e5):null;
+    if(g.lg==="cfb"&&inSeason&&oppRest!=null&&oppRest>0&&oppRest<=20&&restDays-oppRest>=4){
+      E.push({k:"lean",dir:opp,cat:"restfade",play:`${opp} vs the rested team`,why:`${t.ab} has ${restDays} days of rest to ${opp}'s ${oppRest}. In college the folklore is backwards: on 2025 the side with 4+ MORE days of rest covered only 41.7% (n=168, both halves) — rust, not rest. So the lean is the team that just played.`});
+    }
+    else if(g.lg==="nfl"&&inSeason&&restDays>=10) E.push({k:"lean",dir:t.ab,cat:"rest",play:`${t.ab} extra rest`,why:`${restDays} days since their last game (bye week or rescheduling). Backtested on 2025 the rested side covered just 48.8% — no measurable edge — so this is context, not a reason to bet.`});
     else if(inSeason&&restDays<=4) E.push({k:"lean",dir:opp,cat:"shortweek",play:`${t.ab} on a short week`,why:`Only ${restDays} day${restDays===1?"":"s"} of rest — short-week teams (Thursday games, rescheduled games) tend to look sluggish, especially on offense.`});
     // streaks also require the minimum current-season sample — a "3-game skid" built
     // partly from last season's games isn't this team's current form.
+    // WALL TEST 2025: a team held to <=7 last game covers next time out — CFB 58.1%
+    // (n=124, both halves), NFL 69% (n=29). The market over-punishes one bad day.
+    if(inSeason&&f.lastPf!=null&&f.lastPf<=7) E.push({k:"lean",dir:t.ab,cat:"lowprev",play:`${t.ab} +bounce — held to ${f.lastPf} last game`,why:`${t.ab} scored just ${f.lastPf} last time out. Bettors price the ugly box score into this line; on 2025 the team coming off a <=7-point game covered ${g.lg==="cfb"?"58.1% (n=124)":"69% (n=29, thin — college agrees at 58%)"}. One bad offensive day says less about a team than the market thinks.`});
     if(inSeason&&f.of>=MIN_FORM_GAMES&&f.streakLen>=3&&f.streakType==="L") E.push({k:"lean",dir:null,cat:"coldstreak",play:`${t.ab} is cold (${f.streakLen}-game skid)`,why:`Lost ${f.streakLen} straight this season. Public bettors often keep backing a name brand through a slide — check whether the line has actually adjusted for it.`});
     if(inSeason&&f.of>=MIN_FORM_GAMES&&f.streakLen>=4&&f.streakType==="W") E.push({k:"lean",dir:null,cat:"hotstreak",play:`${t.ab} is hot (${f.streakLen}-game streak)`,why:`Won ${f.streakLen} straight this season. Momentum alone isn't an edge, but paired with a soft line it's worth a second look.`});
   });
@@ -1301,11 +1322,24 @@ function edgesForRaw(g){
       E.push({k:"strong",dir:"UNDER",cat:"rankclash",play:`UNDER ${total} — ranked vs ranked`,
         why:`#${hr} ${g.home.ab} vs #${ar} ${g.away.ab}. Top-25 matchups tend to be coached tighter and played closer to the vest than the shootouts the totals market expects. On the 2025 season the UNDER hit 62% (31-19) in ranked-vs-ranked games — the strongest soft signal in the college backtest.`});
     }
+    // WALL TEST: unranked laying 21+ vs an FCS dog -> favorite covers 58.9% (n=73, 59%/67%).
+    if(!ranked(hr)&&!ranked(ar)&&g.spread!=null&&Math.abs(g.spread)>=21){
+      const favT=g.spread<0?g.home:g.away, dogT=g.spread<0?g.away:g.home;
+      if(dogT.conf!=null&&!isFBS(dogT)) E.push({k:"lean",dir:favT.ab,cat:"unrfavfcs",play:`${favT.ab} ${g.spread<0?g.spread:-g.spread} — unranked laying big vs FCS`,why:`${favT.ab} is unranked and laying ${Math.abs(g.spread)} against FCS ${dogT.ab}. Unlike ranked powers, unranked favorites in this spot keep their foot down: on 2025 the favorite covered 58.9% (n=73). Lean-capped — under 100 games.`});
+    }
+    // WALL TEST: closing total 45 or lower -> UNDER 55.1% (n=89, 55%/55%).
+    if(total!=null&&total<=45) E.push({k:"lean",dir:"UNDER",cat:"lowtotal",play:`Lean UNDER ${total} — low total`,why:`Low college totals kept going lower in 2025: 45 or under went UNDER 55.1% of the time (n=89, steady across both halves). Lean-capped.`});
     // HIGH TOTAL — 60+ closing totals went UNDER 53.4% (62-54) in 2025. Modest, kept as a light lean.
     if(total!=null&&total>=60){
       E.push({k:"lean",dir:"UNDER",cat:"hightotal",play:`Lean UNDER ${total} — 60+ total`,
         why:`Totals of 60 or more slightly overshoot: in 2025 they went under 53.4% of the time (n=116). Small lean on its own; matters more when it stacks with something real.`});
     }
+  }
+  // WALL TEST: NFL primetime underdog covered 56.7% (n=60, 56%/57%). College is the
+  // opposite (46%), so NFL-only. Lean-capped: single league, under 100 games.
+  if(g.lg==="nfl"&&g.spread!=null&&g.spread!==0){
+    const hrET=(new Date(g.date).getUTCHours()+20)%24;
+    if(hrET>=19&&hrET<=23){ const dog=g.spread>0?g.home.ab:g.away.ab; E.push({k:"lean",dir:dog,cat:"primedog",play:`${dog} — primetime dog`,why:`Night game. The whole country is watching the favorite, and the number tends to carry that: NFL primetime dogs covered 56.7% in 2025 (n=60, both halves). Lean only.`}); }
   }
   // DIVISIONAL GAME — familiarity breeds tighter, lower-scoring games (a real,
   // long-documented NFL trend: division rivals know each other's schemes cold).
@@ -1894,6 +1928,11 @@ function renderTrackRecord(){
       ${thin.length?`<div class="note" style="margin-top:10px">Not enough data yet to rate: ${thin.map(s=>`<span class="catchip">${s.cat} (${s.n})</span>`).join(" ")}.
         A category needs <b>${MIN_SIGNAL_SAMPLE}+</b> graded calls before a hit rate is shown — a 2-0 signal isn't a 100% signal, and presenting it that way would be the most misleading number on this page.</div>`:""}`
       :`<div class="note" style="margin-top:16px">Once calls start grading, this section breaks the record down <b>by signal type</b> — so if wind edges are hitting and model-gap edges aren't, that shows up here instead of hiding inside one blended number.</div>`}
+    <div class="sech" style="margin-top:22px">Wall test <span class="cnt">108 rules thrown at 2025</span></div>
+    <div class="note">Sixty-plus candidate rules were run against every 2025 game in both leagues — 108 rule×league tests. With that many tests, a few will clear 55% by luck alone, so a rule only counts as <b>stable</b> if it hit 55%+ on 40+ games <b>and</b> beat break-even in <i>both</i> halves of the season separately. Stable winners that can be computed from the live feed are wired in above (tagged WALL TEST); the rest are listed so they can't be quietly cherry-picked later.
+    <br><br><b>Stable:</b> ranked-vs-ranked UNDER (62%) · team held to ≤7 last game (CFB 58%, NFL 69%) · fade the rested college team (58%) · either team 3+ overs → UNDER (CFB 60%, not live yet) · fade 3+ ATS-win streak (CFB 56%, NFL 60%, not live yet) · NFL primetime dog (57%) · CFB total ≤45 UNDER (55%) · unranked laying 21+ vs FCS → favorite (59%).
+    <br><b>Negative, both halves</b> (the opposite side is the play, or the folklore is dead): rested college team ATS 42% · college team off a bye 42% · unranked-vs-unranked dog +21 43% · both teams 13+ days rest OVER 43% · CFB total ≤45 OVER 45% · NFL raw-margin model 37%.
+    <br><b>Coin flips people bet anyway:</b> home dogs (both leagues), divisional under, Thursday under, always-over in college, "letdown" and "bounce-back" spots in college, cold-weather unders (52%).</div>
     <div class="sech" style="margin-top:22px">2025 backtest <span class="cnt">1,155 real games, closing lines</span></div>
     <div class="note">Before this season had any results, the simple rule behind each soft signal was run against every 2025 regular-season game with its real closing line — <b>272 NFL</b> and <b>883 college</b>. These measured rates now seed the signal weights until the board has its own graded sample, and they are kept <b>per league</b> because the two disagree (the NFL leaned OVER last year; college leaned UNDER). Break-even at -110 is <b>52.4%</b>.
     <b>Weather signals are missing on purpose</b> — ESPN strips forecast data from finished games, so wind/precip/cold cannot be backtested this way; they keep their hand-set weights.</div>

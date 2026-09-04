@@ -38,7 +38,13 @@ Walk-forward, no lookahead. Break-even at -110 is 52.4%.
 | Ranked vs ranked → UNDER | — | 62.0% (n=50) |
 | Always OVER | 52.6% | 49.3% |
 | Home dogs ATS | 52.3% | 50.0% |
-| Rested team ATS | 48.8% | — |
+| Rested team ATS | 48.8% | **41.7%** (fade it: 58.3%) |
+| Team held to ≤7 last game | 69.0% (n=29) | 58.1% (n=124) |
+| NFL primetime dog | 56.7% (n=60) | 45.8% (opposite) |
+| Total ≤45 → UNDER | — | 55.1% |
+| Unranked laying 21+ vs FCS → favorite | — | 58.9% |
+
+A 108-test "wall" of candidate rules was run with a split-half stability filter; only both-halves winners were wired in, and every negative finding is displayed in the app.
 
 Priors are kept **per league** because the leagues disagree. Weather signals cannot
 be backtested (ESPN strips forecasts from finished games) and keep hand-set weights.
