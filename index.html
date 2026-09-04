@@ -159,7 +159,7 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .callbox .cb1{font-size:18px;font-weight:800;letter-spacing:.01em;line-height:1.2}
 .callbox .cb2{font-size:13px;color:var(--dim)}
 .callbox .cb3{font-weight:400;color:var(--dim)}
-.callbox.nobet{border-style:dashed}
+.callbox.nobet{border-style:dashed;padding:7px 11px;border-width:1px}
 .callbox.nobet .cb1{font-size:14px;color:var(--dim)}
 .whyd summary{font-size:11px;color:var(--dim);cursor:pointer;margin-top:3px;list-style:none;user-select:none}
 .whyd summary::-webkit-details-marker{display:none}
@@ -177,6 +177,12 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .more summary .dim{font-weight:400}
 .more>*+*{margin-top:8px}
 .lv{color:var(--amber);font-weight:700}
+.intro summary{cursor:pointer;list-style:none;font-size:14px}
+.intro summary::-webkit-details-marker{display:none}
+.intro summary::after{content:" ▸";color:var(--dim)}
+.intro[open] summary::after{content:" ▾"}
+.toprow.watch{opacity:.85;border-style:dashed}
+.strip .cap{display:block;font-size:10px;color:var(--amber);margin-top:2px}
 .strip{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
 .strip>div{flex:1 1 120px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:12.5px;color:var(--dim);text-align:center}
 .strip b{display:block;font-size:22px;color:var(--ink);font-family:"JetBrains Mono",ui-monospace,monospace}
@@ -328,15 +334,12 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
     </div>
     <label class="chk"><input type="checkbox" id="edgesOnly" checked> Edges only</label>
     <label class="chk"><input type="checkbox" id="outdoorOnly"> Outdoor only</label>
+    <label class="chk"><input type="checkbox" id="betsOnly"> Bets only</label>
   </div>
 </header>
 
 <main>
-  <div class="note">
-    <b>How to read this.</b> Books price weather and injuries into lines fast — often before anyone sees it. This board doesn't beat the market;
-    it shows you <b>where conditions and the line disagree</b>, in one place, with the reason spelled out. <b>Strong</b> = a well-documented effect
-    (wind ≥20 mph gusts, a QB ruled out). <b>Lean</b> = worth a look. Everything here is information for your own call — not a guarantee, and never a bet you can't afford to lose.
-  </div>
+  <details class="note intro" id="introNote"><summary><b>How to read this</b></summary><div style="margin-top:8px">Each card leads with <b>the call</b>: bet this side, this much, or no bet. A call only appears when a play is <b>STRONG</b> — hard evidence (a QB ruled out, real line movement, a live pace gap, 25+ mph gusts backed by a second signal) or several weighted signals agreeing. Leans are shown as chips so you can see what's brewing, but they are never a bet. Stakes are quarter-Kelly on your bankroll. Reference only — nothing here places a bet, and never bet what you can't afford to lose.</div></details>
   <div id="board"><div class="empty"><span class="spin"></span> Loading this week's slate…</div></div>
 </main>
 
@@ -396,7 +399,7 @@ const SIGNAL_WEIGHT={
   matchup:1, rest:1, shortweek:1, shortprep:1, divisional:1, homedog:1,
   rank:1, newcoach:1, coachexp:1, primetime:1, keynumber:1, heat:1,
   domefade:1, neutral:1, chalk:1, ats:1, hotstreak:1, coldstreak:1, qbquestion:1,
-  rankclash:1, hightotal:1, ratings:2, livespread:1
+  rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1
 };
 const STACK_STRONG_AT=4;
 /* NFL head coaches for the 2026 season: {TEAM:[name, yearsAsHeadCoach]}.
@@ -787,7 +790,8 @@ const BACKTEST_2025={
   ratings_far:{n:56,pct:42.9,note:"disagree with the market by 6+ pts — LOSES; that far off, the market knows something we don't (capped, never bet)"}
  },
  cfb:{ // 883 FBS regular-season games, real closing lines — the leagues do NOT share priors
-  rank:      {n:79, pct:54.4,note:"ranked team laying 24+ vs unranked -> DOG covered 54.4%; at 28+ it was 58.9% (n=56). Generic 28+ favorites were 47.9% — the edge is the ranked-vs-unranked part, not the spread size"},
+  rank:      {n:79, pct:54.4,note:"ranked team laying 24-27 vs unranked -> DOG covered 54.4% across all 24+ spots. Generic big favorites were 47.9% — the edge is the ranked-vs-unranked part, not the spread size"},
+  rank28:    {n:56, pct:58.9,note:"ranked team laying 28+ vs unranked -> DOG covered 58.9% — the strongest measured spread signal in college"},
   rankclash: {n:50, pct:62.0,note:"ranked vs ranked -> UNDER hit 62% — two real defenses, tighter game scripts"},
   hightotal: {n:116,pct:53.4,note:"closing total 60+ -> UNDER 53.4% — big numbers slightly overshoot"},
   homedog:   {n:290,pct:50.0,note:"college home dogs ATS — dead coin flip, no edge at all"},
@@ -841,14 +845,34 @@ function playProb(cats,lg){
   const p=Math.min(PROB_CAP,list[0].p+extra);
   return {p:Math.round(p*10)/10,src:list[0].src,n:list.length};
 }
+const WEEKLY_EXPOSURE_CAP=0.15;   // of bankroll, across every open bet on the board
+let exposureFactor=1;             // recomputed each render from the raw Kelly stakes
+function rawKelly(p,odds){
+  const b=americanToDecimal(odds||-110)-1, q=p/100;
+  const f=(q*b-(1-q))/b;
+  return f>0?f*KELLY_FRACTION:0;
+}
+function recomputeExposure(){
+  let sum=0;
+  state.games.filter(g=>g.state!=="post").forEach(g=>{ const b=bestPlayRaw(g); if(b) sum+=rawKelly(b.p,-110); });
+  exposureFactor=sum>WEEKLY_EXPOSURE_CAP?WEEKLY_EXPOSURE_CAP/sum:1;
+  return {sum,factor:exposureFactor};
+}
 function kellyStake(p,odds){
   const b=americanToDecimal(odds||-110)-1, q=p/100;
   const f=(q*b-(1-q))/b;
-  if(!(f>0)) return {f:0,pct:0,dollars:0};
-  const frac=f*KELLY_FRACTION;
-  return {f:frac,pct:Math.round(frac*1000)/10,dollars:Math.round(frac*(state.bankroll||0))};
+  if(!(f>0)) return {f:0,pct:0,dollars:0,capped:false};
+  const frac=f*KELLY_FRACTION*exposureFactor;
+  return {f:frac,pct:Math.round(frac*1000)/10,dollars:Math.floor(frac*(state.bankroll||0)),capped:exposureFactor<1};
 }
 // The single best STRONG directional play on a game, with its estimated probability.
+function bestPlayRaw(g){
+  const E=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
+  const byDir={}; E.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
+  let best=null;
+  Object.entries(byDir).forEach(([dir,list])=>{ const cats=[...new Set(list.map(e=>e.cat))]; const pr=playProb(cats,g.lg); if(pr&&(!best||pr.p>best.p)) best={dir,cats,p:pr.p}; });
+  return best;
+}
 function bestPlay(g){
   const E=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
   const byDir={}; E.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
@@ -883,7 +907,7 @@ function callBox(g){
     </div>`;
   }
   const E=edgesFor(g);
-  if(E.some(e=>e.dir)) return `<div class="callbox nobet"><div class="cb1">◦ NO BET — leans only</div><div class="cb2">Something's leaning but nothing here is strong enough to stake. Watch it; don't bet it.</div></div>`;
+  if(E.some(e=>e.dir)) return `<div class="callbox nobet"><div class="cb1">◦ No bet <span class="cb3">— leans only, nothing strong enough to stake</span></div></div>`;
   return "";
 }
 function bestChip(b){
@@ -1155,6 +1179,15 @@ function edgesFor(g){
   // family that cannot be backtested here, so a weather "strong" must be backed by
   // an independent non-weather signal pointing the same way, or it's a lean.
   E.forEach(e=>{
+    if(!e.dir||e.stacked||e.conflict) return;
+    const pr=catProb(e.cat,g.lg);
+    const st=pr.src==="live"?(state.learned||{})[e.cat]:(BACKTEST_2025[g.lg]||{})[e.cat];
+    if(pr.src!=="prior"&&st&&st.n>=40){
+      if(e.k==="lean"&&pr.p>=55&&!WEATHER_CATS.has(e.cat)){ e.k="strong"; e.why+=` <b>Measured strong:</b> this signal hit ${pr.p}% on ${st.n} games (${pr.src==="live"?"this board's own record":"2025 backtest"}).`; }
+      if(e.k==="strong"&&pr.p<52.4){ e.k="lean"; e.why+=` <b>Held at lean:</b> measured at ${pr.p}% on ${st.n} games — below break-even, so it can't be a strong call.`; }
+    }
+  });
+  E.forEach(e=>{
     if(e.k==="strong"&&WEATHER_CATS.has(e.cat)&&e.dir){
       const backed=E.some(o=>o!==e&&o.dir===e.dir&&!WEATHER_CATS.has(o.cat));
       if(!backed){ e.k="lean"; e.why+=` <b>Held at lean:</b> weather alone doesn't make a strong call on this board — it needs a second, non-weather signal agreeing.`; }
@@ -1245,13 +1278,14 @@ function edgesForRaw(g){
     if(homeRankedBigFav||awayRankedBigFav){
       const fav=homeRankedBigFav?g.home.ab:g.away.ab, dog=homeRankedBigFav?g.away.ab:g.home.ab;
       const rk=homeRankedBigFav?hr:ar;
-      E.push({k:"lean",dir:dog,cat:"rank",play:`${dog} +${Math.abs(g.spread)} — huge-number dog`,
+      const huge=Math.abs(g.spread)>=28;
+      E.push({k:huge?"strong":"lean",dir:dog,cat:huge?"rank28":"rank",play:`${dog} +${Math.abs(g.spread)} — #${rk} ${fav} laying ${Math.abs(g.spread)} vs unranked`,
         why:`${fav} (#${rk}) is laying ${Math.abs(g.spread)} against an unranked opponent. Enormous college spreads are hard to cover: winning teams empty the bench, call off the dogs in the 4th, and backdoor points are common. The favorite usually wins — covering by four touchdowns is a different question. Backtested on 2025: this exact spot cashed for the dog ${Math.abs(g.spread)>=28?"58.9% of the time at 28+ (n=56)":"54.4% of the time (n=79), and 58.9% once the number reaches 28"}.`});
     }
     // RANKED vs RANKED — two legitimate defenses and a conservative game script.
     // 2025 backtest: the UNDER hit 62% in these games (31-19). Not thin, not folklore.
     if(ranked(hr)&&ranked(ar)&&total!=null){
-      E.push({k:"lean",dir:"UNDER",cat:"rankclash",play:`Lean UNDER ${total} — ranked vs ranked`,
+      E.push({k:"strong",dir:"UNDER",cat:"rankclash",play:`UNDER ${total} — ranked vs ranked`,
         why:`#${hr} ${g.home.ab} vs #${ar} ${g.away.ab}. Top-25 matchups tend to be coached tighter and played closer to the vest than the shootouts the totals market expects. On the 2025 season the UNDER hit 62% (31-19) in ranked-vs-ranked games — the strongest soft signal in the college backtest.`});
     }
     // HIGH TOTAL — 60+ closing totals went UNDER 53.4% (62-54) in 2025. Modest, kept as a light lean.
@@ -1564,12 +1598,26 @@ function renderTop(){
   const box=document.getElementById("board");
   const rows=topPlays(12);
   if(!rows.length){
-    box.innerHTML='<div class="note">Top Plays ranks every <b>strong</b> edge across the whole slate by how many independent signals back it. Nothing qualifies right now — that usually means conditions are mild and the lines look fair. Check back closer to kickoff, when weather firms up and injury reports land.</div>';
+    // watch list: best LEANS by estimated hit rate — clearly not bets
+    const leans=[];
+    state.games.filter(g=>g.state!=="post").forEach(g=>{
+      const E=edgesFor(g).filter(e=>e.dir&&!e.stacked&&!e.conflict); const byDir={};
+      E.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
+      Object.entries(byDir).forEach(([dir,list])=>{ const cats=[...new Set(list.map(e=>e.cat))]; const pr=playProb(cats,g.lg); if(pr) leans.push({g,dir,cats,p:pr.p,lead:list[0]}); });
+    });
+    leans.sort((a,b)=>b.p-a.p||b.cats.length-a.cats.length);
+    box.innerHTML=`<div class="note"><b>No strong plays right now — so no bets.</b> Nothing on the slate clears the bar (hard evidence, or measured signals agreeing). That's the honest answer; it changes as weather firms up, injury reports land and lines move. Below is the <b>watch list</b>: the best leans, ranked by estimated hit rate. <b>These are not stakes.</b></div>
+      ${leans.slice(0,12).map((r,i)=>`<div class="toprow watch"><div class="topnum">${i+1}</div><div class="topbody">
+        <div class="topplay">◦ WATCH: ${callNumber(r.g,r.dir,r.g.state==="in")}</div>
+        <div class="topgame">${r.g.name} · ${fmtTime(r.g.date)} · ${r.lead.play}</div>
+        <div class="topcats">${r.cats.map(c=>`<span class="catchip">${c}</span>`).join("")}</div></div>
+        <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">no stake</div></div></div>`).join("")||'<div class="empty">Nothing leaning either — the slate looks priced fairly.</div>'}`;
     updateLive(); return;
   }
-  box.innerHTML=`<div class="note"><b>What gets on this list:</b> a play has to be <b>STRONG</b>. That means either one piece of hard evidence — a QB ruled out, 25+ mph gusts on a total, real line movement, a live pace gap — or several weighted signals agreeing to a score of 4+. Leans never qualify, no matter how many. Then the list is ranked by <b>estimated hit rate</b> (this board's own record once it has one, else the 2025 backtest, else a conservative default) and the stake is <b>quarter-Kelly</b> on your bankroll at -110. Break-even is 52.4%; at or under it, no stake. Estimates, capped at 60% — not promises.</div>
-    <div class="prow"><div class="pstake"><label>Bankroll $ <input type="number" id="bankrollInput" value="${state.bankroll}" min="0" step="50" style="width:100px"></label></div>
-      <div class="note" style="margin:0;flex:1;min-width:200px">Stake math is reference only — nothing is placed. Quarter-Kelly is deliberately conservative: full Kelly assumes the probability is exactly right.</div></div>
+  const ex=recomputeExposure();
+  box.innerHTML=`<details class="note intro"><summary><b>What gets on this list</b></summary><div style="margin-top:8px">A play has to be <b>STRONG</b>. That means either one piece of hard evidence — a QB ruled out, 25+ mph gusts on a total, real line movement, a live pace gap — or several weighted signals agreeing to a score of 4+. Leans never qualify, no matter how many. Then the list is ranked by <b>estimated hit rate</b> (this board's own record once it has one, else the 2025 backtest, else a conservative default) and the stake is <b>quarter-Kelly</b> on your bankroll at -110. Break-even is 52.4%; at or under it, no stake. Estimates, capped at 60% — not promises. Stakes are reference only; nothing is placed. The week's open bets are capped at <b>${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll</b> combined, because ten plays from the same signal are not ten independent bets.</div></details>
+    <div class="prow" style="align-items:center"><div class="pstake"><label>Bankroll $ <input type="number" id="bankrollInput" value="${state.bankroll}" min="0" step="50" style="width:100px"></label></div>
+      <span class="dim" style="font-size:12px">${ex.factor<1?`stakes scaled ×${ex.factor.toFixed(2)} — weekly cap of ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% reached`:`quarter-Kelly · weekly cap ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll`}</span></div>
     ${rows.map((r,i)=>`<div class="toprow">
       <div class="topnum">${i+1}</div>
       <div class="topbody">
@@ -1934,7 +1982,7 @@ function dayLabel(iso,gstate){
   const days=Math.round((startOfDay(d)-startOfDay(now))/864e5);
   const t=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
   if(days<0) return "Earlier this week";
-  if(days===0) return d.getHours()>=17?`Tonight · first kick ${t}`:`Today · first kick ${t}`;
+  if(days===0) return d.getHours()>=17?"Tonight":"Today";
   if(days===1) return "Tomorrow";
   return d.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
 }
@@ -2015,6 +2063,7 @@ function card(g){
   </div>`;
 }
 function render(){
+  recomputeExposure();
   if(state.view==="track"){ renderTrackRecord(); return; }
   if(state.view==="alerts"){ renderAlerts(); return; }
   if(state.view==="data"){ renderData(); return; }
@@ -2025,18 +2074,19 @@ function render(){
   let gs=state.games.slice();
   if(state.league!=="all") gs=gs.filter(g=>g.lg===state.league);
   if(state.outdoorOnly) gs=gs.filter(g=>!( (state.detail[g.id]||{}).indoor||g.indoor ));
-  if(state.edgesOnly) gs=gs.filter(g=>edgesForScored(g).length>0);
+  if(state.betsOnly) gs=gs.filter(g=>g.state!=="post"&&bestPlay(g));
+  else if(state.edgesOnly) gs=gs.filter(g=>edgesForScored(g).length>0);
   else gs.forEach(g=>edgesForScored(g));   // still compute signalScore for sort
   gs.sort((a,b)=>(b.signalScore||0)-(a.signalScore||0) || new Date(a.date)-new Date(b.date));
   if(!gs.length){
-    box.innerHTML=`<div class="empty">${state.games.length?"No games match — try turning off <b>Edges only</b>.":"<span class='spin'></span> Loading…"}</div>`;
+    box.innerHTML=`<div class="empty">${state.games.length?(state.betsOnly?"No strong plays on the board right now — nothing qualifies for a bet. That's the honest answer, not a bug.":"No games match — try turning off <b>Edges only</b>."):"<span class='spin'></span> Loading…"}</div>`;
     updateLive(); return;
   }
   const sec=(t,list)=>list.length?`<div class="sech">${t} <span class="cnt">${list.length}</span></div><div class="lgrid">${list.map(card).join("")}</div>`:"";
   const strip=(()=>{
     const open=gs.filter(g=>g.state!=="post"); const bets=open.map(g=>bestPlay(g)).filter(Boolean);
     const stake=bets.reduce((a,b)=>a+(b.stake.dollars||0),0); const lv=open.filter(g=>g.state==="in").length;
-    return `<div class="strip"><div><b>${bets.length}</b> bet${bets.length===1?"":"s"}</div><div><b>$${stake}</b> total stake</div><div><b>${lv}</b> live</div><div><b>${open.length-bets.length}</b> no-bet</div></div>`;
+    return `<div class="strip"><div><b>${bets.length}</b> bet${bets.length===1?"":"s"}</div><div><b>$${stake}</b> total stake${exposureFactor<1?`<span class="cap">capped at ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll</span>`:""}</div><div><b>${lv}</b> live</div><div><b>${open.length-bets.length}</b> no-bet</div></div>`;
   })();
   if(state.sort==="best"){
     // Best bets of the week: only games with a STRONG directional play, ranked by
@@ -2057,7 +2107,10 @@ function render(){
     });
     const buckets=new Map();
     gs.forEach(g=>{ const k=dayLabel(g.date,g.state); if(!buckets.has(k)) buckets.set(k,[]); buckets.get(k).push(g); });
-    box.innerHTML=strip+[...buckets].map(([label,list])=>sec(label,list)).join("");
+    box.innerHTML=strip+[...buckets].map(([label,list])=>{
+      const first=list.find(g=>g.state!=="in"); const t=first?` <span class="cnt">first kick ${new Date(first.date).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}</span>`:"";
+      return sec(label+(label==="Tonight"||label==="Today"?t:""),list);
+    }).join("");
   } else {
     const nfl=gs.filter(g=>g.lg==="nfl"), cfb=gs.filter(g=>g.lg==="cfb");
     box.innerHTML=strip+sec("NFL",nfl)+sec("College Football",cfb);
@@ -2076,10 +2129,12 @@ function updateLive(){
 /* ---------- controls + refresh ---------- */
 document.getElementById("viewSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
   state.view=b.dataset.view;[...e.currentTarget.children].forEach(x=>x.dataset.on=(x===b)?"1":"0");
+  try{ history.replaceState(null,"",state.view==="board"?" ":"#"+(state.view==="track"?"results":state.view)); }catch(err){}
   const boardOnly=state.view==="board";
   document.getElementById("leagueSeg").style.display=(boardOnly||state.view==="data")?"":"none";
   document.getElementById("edgesOnly").closest("label").style.display=boardOnly?"":"none";
   document.getElementById("outdoorOnly").closest("label").style.display=boardOnly?"":"none";
+  document.getElementById("betsOnly").closest("label").style.display=boardOnly?"":"none";
   render();});
 document.getElementById("board").addEventListener("change",e=>{
   const cb=e.target.closest("[data-leg]"); if(!cb) return;
@@ -2090,7 +2145,13 @@ document.getElementById("sortSeg").addEventListener("click",e=>{const b=e.target
   state.sort=b.dataset.sort;[...e.currentTarget.children].forEach(x=>x.dataset.on=(x===b)?"1":"0");render();});
 document.getElementById("leagueSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
   state.league=b.dataset.lg;[...e.currentTarget.children].forEach(x=>x.dataset.on=(x===b)?"1":"0");render();});
+// intro stays open until it's been read once, then folds
+(()=>{ const el=document.getElementById("introNote"); if(!el) return; el.open=!lsGet("edgeboard-intro-read",0); el.addEventListener("toggle",()=>{ if(!el.open) lsSet("edgeboard-intro-read",1); }); })();
+// deep links: #top #props #results #parlay #alerts #data
+(()=>{ const h=(typeof location!=="undefined"?location.hash:"").replace("#",""); const map={top:"top",props:"props",results:"track",track:"track",parlay:"parlay",alerts:"alerts",data:"data",board:"board"};
+  if(map[h]){ state.view=map[h]; const seg=document.getElementById("viewSeg"); if(seg) [...seg.children].forEach(x=>x.dataset.on=(x.dataset.view===state.view)?"1":"0"); } })();
 document.getElementById("edgesOnly").addEventListener("change",e=>{state.edgesOnly=e.target.checked;render();});
+document.getElementById("betsOnly").addEventListener("change",e=>{state.betsOnly=e.target.checked;render();});
 document.getElementById("outdoorOnly").addEventListener("change",e=>{state.outdoorOnly=e.target.checked;render();});
 document.getElementById("refreshBtn").addEventListener("click",()=>{loadSlate();});
 function applyTheme(){const r=document.documentElement;if(state.theme)r.setAttribute("data-theme",state.theme);else r.removeAttribute("data-theme");}
