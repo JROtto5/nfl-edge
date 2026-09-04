@@ -1,0 +1,1890 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Edge Board</title>
+<meta name="description" content="Live NFL + college football betting edges from weather, injuries and model-vs-market gaps. Auto-updating.">
+<meta name="theme-color" content="#0a0e14">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Edge Board">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#0a0e14; --bg2:#0e141d; --panel:#121a24; --panel2:#18222e; --line:#22303f;
+  --ink:#e6edf5; --dim:#8ba0b6; --mute:#5b6f85;
+  --amber:#ffb020; --cyan:#2fd4d4; --green:#31c97a; --red:#ff5a52; --violet:#a98bff;
+  --shadow:0 12px 34px rgba(0,0,0,.5); --r:12px;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#eef1f5; --bg2:#e6ebf1; --panel:#ffffff; --panel2:#f3f6fa; --line:#d3dce7;
+    --ink:#111a24; --dim:#4d6076; --mute:#7d8fa3;
+    --amber:#b06f00; --cyan:#0f8f8f; --green:#0d8f52; --red:#c0362f; --violet:#6b4fd0;
+    --shadow:0 12px 30px rgba(30,45,70,.13);
+  }
+}
+:root[data-theme="light"]{
+  --bg:#eef1f5; --bg2:#e6ebf1; --panel:#ffffff; --panel2:#f3f6fa; --line:#d3dce7;
+  --ink:#111a24; --dim:#4d6076; --mute:#7d8fa3;
+  --amber:#b06f00; --cyan:#0f8f8f; --green:#0d8f52; --red:#c0362f; --violet:#6b4fd0;
+  --shadow:0 12px 30px rgba(30,45,70,.13);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+h1,h2,h3,.disp{font-family:"Barlow Condensed",Inter,sans-serif;font-weight:700;letter-spacing:.02em}
+button{font-family:inherit;cursor:pointer;color:inherit}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+img{max-width:100%}
+
+header{position:sticky;top:0;z-index:30;background:linear-gradient(180deg,var(--panel2),var(--panel));border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
+.hrow{max-width:1360px;margin:0 auto;padding:11px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:11px;margin-right:auto;min-width:0}
+.dish{width:38px;height:38px;border-radius:10px;background:radial-gradient(circle at 32% 28%,var(--amber),#9a5f00);display:grid;place-items:center;font-size:20px;flex:none}
+.brand h1{margin:0;font-size:25px;line-height:1;text-transform:uppercase}
+.brand .sub{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.16em;margin-top:3px}
+.win{font-family:"Barlow Condensed";font-weight:600;font-size:15px;color:var(--amber);white-space:nowrap}
+.win small{display:block;font-family:Inter;font-weight:500;font-size:10px;color:var(--mute);letter-spacing:.12em;text-transform:uppercase}
+.live{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg2);font-size:12px;color:var(--dim);white-space:nowrap}
+.live .d{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.tbtn{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:13px}
+.tbtn:hover{border-color:var(--amber)}
+
+.bar{max-width:1360px;margin:0 auto;padding:0 18px 11px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{background:var(--bg2);border:0;padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--dim);letter-spacing:.03em}
+.seg button[data-on="1"]{background:var(--panel2);color:var(--amber)}
+.chk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--dim);cursor:pointer;padding:6px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg2)}
+.chk input{accent-color:var(--amber)}
+
+main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
+.note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:10px;padding:12px 15px;margin-bottom:16px;font-size:13px;color:var(--dim);line-height:1.6}
+.note b{color:var(--ink)}
+/* min(360px,100%) is the key: on a phone the track collapses to the viewport
+   instead of demanding 360px and forcing the whole page to scroll sideways. */
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:14px}
+.sech{display:flex;align-items:center;gap:10px;margin:26px 0 12px;font-family:"Barlow Condensed";font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:19px}
+.sech:first-child{margin-top:4px}
+.sech .cnt{font-family:"JetBrains Mono";font-size:12px;color:var(--mute);font-weight:500}
+.sech::after{content:"";flex:1;height:1px;background:var(--line)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+.card.hot{border-color:color-mix(in srgb,var(--amber) 50%,var(--line))}
+.ctop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.teams{display:flex;flex-direction:column;gap:5px;min-width:0}
+.tm{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px}
+.tm img{width:22px;height:22px;object-fit:contain;flex:none}
+.tm .rec{font-size:11px;color:var(--mute);font-weight:400}
+.tm .rnk{font-family:"Barlow Condensed";font-weight:700;font-size:12px;color:var(--amber);flex:none}
+.tm.fav{color:var(--amber)}
+.when{text-align:right;font-size:11.5px;color:var(--dim);white-space:nowrap}
+.when .st{font-family:"Barlow Condensed";font-weight:600;font-size:14px;color:var(--ink);text-transform:uppercase}
+.when .st.livegame{color:var(--red)}
+.lines{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-radius:9px;overflow:hidden}
+.ln{background:var(--bg2);padding:8px 6px;text-align:center}
+.ln .l{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.ln .v{font-family:"JetBrains Mono";font-weight:700;font-size:14px;margin-top:2px}
+/* projected line block */
+.proj{border:1px solid color-mix(in srgb,var(--cyan) 34%,var(--line));background:color-mix(in srgb,var(--cyan) 6%,var(--bg2));border-radius:10px;padding:9px 11px}
+.projhead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px}
+.projhead .pl{font-family:"Barlow Condensed";font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:12px;color:var(--cyan)}
+.pconf{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid var(--line);color:var(--mute)}
+.pconf.high{color:var(--green);border-color:color-mix(in srgb,var(--green) 50%,transparent)}
+.pconf.medium{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 50%,transparent)}
+.projrow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.pcell{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+.pcell .pk{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.pcell .pv{font-family:"Barlow Condensed";font-weight:700;font-size:19px;line-height:1.1;margin-top:1px}
+.pcell .pm{font-family:"JetBrains Mono";font-size:10.5px;color:var(--dim);margin-top:2px}
+.pcell .nomkt{color:var(--violet)}
+.pedges{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.pedge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--dim)}
+.pedge.big{border-color:var(--amber);color:var(--amber)}
+.pedge.flat{opacity:.65}
+.pnote{font-size:11.5px;color:var(--violet);margin-top:7px;line-height:1.5}
+.pwhy{margin-top:7px}
+.pwhy summary{cursor:pointer;font-size:11px;color:var(--mute);list-style:none}
+.pwhy summary::-webkit-details-marker{display:none}
+.pwhy summary:before{content:"▸ ";color:var(--cyan)}
+.pwhy[open] summary:before{content:"▾ "}
+.pwhy>div{font-size:11.5px;color:var(--dim);line-height:1.6;margin-top:6px;padding-left:2px}
+.cond{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--dim)}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg2);font-size:11px;font-weight:600}
+.pill.wind{border-color:color-mix(in srgb,var(--cyan) 55%,transparent);color:var(--cyan)}
+.pill.rain{border-color:color-mix(in srgb,var(--violet) 55%,transparent);color:var(--violet)}
+.pill.cold{border-color:color-mix(in srgb,var(--cyan) 45%,transparent);color:var(--cyan)}
+.pill.dome{border-color:var(--line);color:var(--mute)}
+.pill.inj{border-color:color-mix(in srgb,var(--red) 55%,transparent);color:var(--red)}
+.edges{display:flex;flex-direction:column;gap:7px}
+.edge{border-radius:9px;padding:9px 11px;border:1px solid var(--line);background:var(--bg2);display:flex;gap:9px;align-items:flex-start}
+.edge.strong{border-color:color-mix(in srgb,var(--amber) 60%,transparent);background:color-mix(in srgb,var(--amber) 9%,var(--bg2))}
+.edge.stacked{border-color:color-mix(in srgb,var(--green) 60%,transparent);background:color-mix(in srgb,var(--green) 10%,var(--bg2))}
+.edge.conflict{border-color:color-mix(in srgb,var(--violet) 60%,transparent);background:color-mix(in srgb,var(--violet) 10%,var(--bg2))}
+.edge .tag{font-family:"Barlow Condensed";font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;flex:none;margin-top:1px}
+.edge.strong .tag{background:var(--amber);color:#241a02}
+.edge.lean .tag{background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
+.edge .body{min-width:0}
+.edge .play{font-weight:700;font-size:14px}
+.edge .why{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.5}
+.nodata{color:var(--mute);font-size:12px;font-style:italic}
+.empty{text-align:center;padding:44px 20px;color:var(--mute)}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--amber);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* top plays */
+.toprow{display:flex;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:9px;box-shadow:var(--shadow)}
+.toprow:nth-child(2){border-color:color-mix(in srgb,var(--amber) 55%,var(--line))}
+.topnum{font-family:"Barlow Condensed";font-weight:700;font-size:26px;color:var(--amber);width:30px;text-align:center;flex:none}
+.topbody{min-width:0;flex:1}
+.topplay{font-weight:700;font-size:15.5px}
+.topgame{font-size:12px;color:var(--dim);margin-top:2px}
+.topcats{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.catchip{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--bg2);border:1px solid var(--line);color:var(--dim)}
+.topsupport{text-align:center;flex:none}
+.srcnote{font-size:10px;color:var(--dim);margin-left:4px}
+.bestchip{font-size:12px;color:var(--dim);padding:7px 10px;border:1px dashed var(--line);border-radius:9px;margin:8px 0 2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pill.live{border-color:var(--amber);color:var(--ink)}
+.rbadge.live{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.bestchip.good{border-color:var(--green);color:var(--ink)}
+.bestchip .src{font-size:10px;text-transform:uppercase;letter-spacing:.05em;opacity:.75;margin-left:auto}
+.topsupport .tsn{font-family:"Barlow Condensed";font-weight:700;font-size:22px;color:var(--green)}
+.topsupport .tsl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+/* track record */
+.tkpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.tk{background:var(--panel);padding:14px 8px;text-align:center}
+.tk .tn{font-family:"Barlow Condensed";font-weight:700;font-size:24px}
+.tk .tl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-top:2px}
+.trow{display:flex;gap:12px;align-items:flex-start;padding:11px 4px;border-bottom:1px solid var(--line)}
+.trow:last-child{border-bottom:0}
+.tbody{min-width:0}
+.tplay{font-weight:600;font-size:14px}
+.tsub{font-size:12px;color:var(--dim);margin-top:2px}
+.rbadge{flex:none;font-family:"Barlow Condensed";font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:6px;margin-top:1px}
+.rbadge.win{background:color-mix(in srgb,var(--green) 22%,transparent);color:var(--green)}
+.rbadge.loss{background:color-mix(in srgb,var(--red) 22%,transparent);color:var(--red)}
+.rbadge.push{background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
+.rbadge.pend{background:var(--panel2);color:var(--mute);border:1px solid var(--line)}
+.sigrow{display:flex;align-items:center;gap:11px;padding:8px 4px;border-bottom:1px solid var(--line)}
+.sigrow:last-child{border-bottom:0}
+.sigbar{flex:1;height:8px;background:var(--bg2);border-radius:5px;overflow:hidden;border:1px solid var(--line);min-width:90px}
+.sigbar i{display:block;height:100%;border-radius:5px}
+.sigpct{font-weight:700;font-size:13px;width:42px;text-align:right}
+.signum{font-size:11.5px;color:var(--mute);white-space:nowrap}
+.fadetag{font-size:10px;font-weight:600;letter-spacing:.04em;padding:1px 6px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+/* parlay */
+.prow{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.pstake input{background:var(--bg2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:14px}
+.pcalc{display:flex;gap:1px;background:var(--line);border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.pk{background:var(--panel);padding:9px 16px;text-align:center}
+.pk .pn{font-family:"JetBrains Mono";font-weight:700;font-size:17px;color:var(--amber)}
+.pk .pl{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-top:2px}
+.plegs{display:flex;flex-direction:column;gap:1px;background:var(--line);border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.pleg{display:flex;gap:11px;align-items:center;background:var(--panel);padding:11px 13px;cursor:pointer}
+.pleg input{accent-color:var(--amber);width:16px;height:16px;flex:none}
+.plegbody{min-width:0;flex:1}
+.pt{font-weight:600;font-size:13.5px}
+.ps{font-size:11.5px;color:var(--dim);margin-top:1px}
+.po{font-weight:700;font-size:13px;flex:none}
+footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font-size:11.5px;line-height:1.7}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------------- PHONE ----------------
+   Everything here is about not overflowing a ~390px viewport: tighter gutters,
+   nav rows that scroll horizontally instead of wrapping into a tall mess, and
+   card internals that shrink rather than push the page sideways. */
+@media (max-width:640px){
+  body{font-size:14.5px}
+  main{padding:12px 12px 90px}
+  .hrow{padding:9px 12px;gap:10px}
+  .bar{padding:0 12px 10px;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .bar::-webkit-scrollbar{display:none}
+  .bar .seg,.bar .chk{flex:none}
+  .brand h1{font-size:20px}
+  .brand .sub{font-size:9px;letter-spacing:.12em}
+  .dish{width:32px;height:32px;font-size:17px}
+  .win{font-size:13px}
+  .live{font-size:11px;padding:5px 10px}
+  .tbtn{padding:5px 9px;font-size:12px}
+  .hrow{flex-wrap:wrap;row-gap:7px}
+  .hrow .live{order:5;flex:1 1 100%}   /* status gets its own full-width row instead of squeezing the buttons off */
+  .seg button{padding:7px 11px;font-size:12px}
+  .note{font-size:12.5px;padding:11px 13px}
+  .sech{font-size:16px;margin:20px 0 10px}
+  .card{padding:11px 12px;gap:9px}
+  .tm{font-size:14.5px}
+  .tm img{width:19px;height:19px}
+  .ln .v{font-size:13px}
+  .ln{padding:7px 4px}
+  .when{font-size:10.5px}
+  .when .st{font-size:12.5px}
+  .edge{padding:8px 10px;gap:8px}
+  .edge .play{font-size:13.5px}
+  .edge .why{font-size:11.5px}
+  .tkpis{grid-template-columns:repeat(2,1fr)}
+  .toprow{padding:11px 12px;gap:10px}
+  .topplay{font-size:14px}
+  .topnum{font-size:21px;width:22px}
+  .grid-wrap,.lines{max-width:100%}
+  footer{padding:0 12px 34px}
+}
+/* very small phones */
+@media (max-width:380px){
+  .ln .l{font-size:8px;letter-spacing:.06em}
+  .ln .v{font-size:12px}
+  .brand h1{font-size:18px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <div class="brand">
+      <div class="dish">📡</div>
+      <div><h1>The Edge Board</h1><div class="sub">Live Weather · Injury · Market Edges</div></div>
+    </div>
+    <div class="win" id="winLabel">—<small>Betting week</small></div>
+    <div class="live"><span class="d"></span><span id="liveTxt">connecting…</span></div>
+    <a class="tbtn" href="/intro" title="Watch the intro" style="text-decoration:none">▶ Intro</a>
+    <button class="tbtn" id="themeBtn" title="Theme">◑</button>
+    <button class="tbtn" id="refreshBtn" title="Refresh now">⟳</button>
+  </div>
+  <div class="bar">
+    <div class="seg" id="viewSeg">
+      <button data-view="board" data-on="1">Board</button>
+      <button data-view="top">★ Top Plays</button>
+      <button data-view="props">Props</button>
+      <button data-view="track">Track Record</button>
+      <button data-view="parlay">Parlay Builder</button>
+    </div>
+    <div class="seg" id="leagueSeg">
+      <button data-lg="all" data-on="1">All</button>
+      <button data-lg="nfl">NFL</button>
+      <button data-lg="cfb">College</button>
+    </div>
+    <div class="seg" id="sortSeg">
+      <button data-sort="time" data-on="1">⏱ Kickoff order</button>
+      <button data-sort="edge">🔥 Best edges</button>
+      <button data-sort="best">🏆 Best bets</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="edgesOnly" checked> Edges only</label>
+    <label class="chk"><input type="checkbox" id="outdoorOnly"> Outdoor only</label>
+  </div>
+</header>
+
+<main>
+  <div class="note">
+    <b>How to read this.</b> Books price weather and injuries into lines fast — often before anyone sees it. This board doesn't beat the market;
+    it shows you <b>where conditions and the line disagree</b>, in one place, with the reason spelled out. <b>Strong</b> = a well-documented effect
+    (wind ≥20 mph gusts, a QB ruled out). <b>Lean</b> = worth a look. Everything here is information for your own call — not a guarantee, and never a bet you can't afford to lose.
+  </div>
+  <div id="board"><div class="empty"><span class="spin"></span> Loading this week's slate…</div></div>
+</main>
+
+<footer>
+  Data: ESPN public feeds (odds via DraftKings, weather, injuries, matchup model). Lines move — always confirm at your book before betting.
+  Auto-refresh: odds every 60s, weather &amp; injuries every 5 min. Week runs Monday → Sunday.
+</footer>
+
+<script>
+"use strict";
+(function(){
+const NFL="https://site.api.espn.com/apis/site/v2/sports/football/nfl";
+const CFB="https://site.api.espn.com/apis/site/v2/sports/football/college-football";
+// ESPN's core API keeps odds the scoreboard drops at kickoff — the pregame closer
+// AND a separate "DraftKings - Live Odds" line while the game is in progress.
+const CORE="https://sports.core.api.espn.com/v2/sports/football/leagues";
+const CORE_LG={nfl:"nfl",cfb:"college-football"};
+function parseCoreOdds(items){
+  const out={};
+  (items||[]).forEach(it=>{
+    const name=it.provider?.name||"";
+    const isLive=/live/i.test(name);
+    if(it.spread==null&&it.overUnder==null) return;
+    const k=isLive?"live":"pre";
+    if(out[k]) return;                        // first of each kind wins (DraftKings first)
+    out[k]={spread:it.spread??null,total:it.overUnder??null,details:it.details||null};
+  });
+  return out;
+}
+const state={league:"all",edgesOnly:true,outdoorOnly:false,games:[],detail:{},theme:null,lastOdds:0,
+  view:"board",parlayPicks:new Set(),stake:10,sort:"time",bankroll:lsGet("edgeboard-bankroll",1000),
+  power:{},results:[],powerAt:0,learned:{}};
+
+/* High-altitude venues (thin air -> more scoring, harder cardio for visitors,
+   longer field-goal carry). Short and stable, worth hardcoding. */
+const ALTITUDE={"Empower Field at Mile High":5280,"Falcon Stadium":6621,"War Memorial Stadium":7220};
+/* NFL teams whose HOME dome is indoor — used to flag "dome team on the road outdoors"
+   (they rarely practice/play in real wind and cold, and it shows). */
+const DOME_HOME_TEAMS=new Set(["ATL","NO","DET","MIN","IND","LV","ARI","DAL","HOU"]); // retractable roofs included
+/* Minimum CURRENT-SEASON games before any "recent form" claim (pace, matchup,
+   streaks) is allowed to fire. Early-season averages off 1-2 games are noise. */
+const MIN_FORM_GAMES=3;
+
+/* ---- How much each signal is actually worth ----
+   Not all evidence is equal. Measured, hard, physical effects (a QB ruled out,
+   20mph gusts, money visibly moving the line) are worth far more than soft
+   historical trends (home dogs cover a bit more than half the time). Weighting
+   these instead of counting them is what keeps "Strong" from becoming noise:
+     3 = hard evidence happening right now
+     2 = solid, quantified model/market disagreement
+     1 = a real but soft long-run tendency
+   A stack must total STACK_STRONG_AT to earn the Strong label, so two soft
+   trends agreeing stays a Lean while wind + a QB out clears it easily. */
+const SIGNAL_WEIGHT={
+  qbout:3, steam:3, wind:3, livepace:3, precip:2,
+  pace:2, model:2, juice:2, altitude:2, cold:2, skillout:2,
+  matchup:1, rest:1, shortweek:1, shortprep:1, divisional:1, homedog:1,
+  rank:1, newcoach:1, coachexp:1, primetime:1, keynumber:1, heat:1,
+  domefade:1, neutral:1, chalk:1, ats:1, hotstreak:1, coldstreak:1, qbquestion:1,
+  rankclash:1, hightotal:1, ratings:2, livespread:1
+};
+const STACK_STRONG_AT=4;
+/* NFL head coaches for the 2026 season: {TEAM:[name, yearsAsHeadCoach]}.
+   Crawled once from ESPN's core API (/seasons/2026/teams/{id}/coaches ->
+   /coaches/{id}.experience) and baked in, because building this live would cost
+   64+ requests on every page load. Head coaches essentially only change in the
+   offseason, so a per-season snapshot is the right tradeoff. Snapshot: 2026-09-03. */
+const NFL_COACH={"ARI":["Mike LaFleur",0],"ATL":["Kevin Stefanski",6],"BAL":["Jesse Minter",0],"BUF":["Joe Brady",0],"CAR":["Dave Canales",2],"CHI":["Ben Johnson",1],"CIN":["Zac Taylor",7],"CLE":["Todd Monken",0],"DAL":["Brian Schottenheimer",1],"DEN":["Sean Payton",18],"DET":["Dan Campbell",6],"GB":["Matt LaFleur",7],"HOU":["DeMeco Ryans",3],"IND":["Shane Steichen",3],"JAX":["Liam Coen",1],"KC":["Andy Reid",27],"LAC":["Jim Harbaugh",6],"LAR":["Sean McVay",9],"LV":["Klint Kubiak",0],"MIA":["Jeff Hafley",0],"MIN":["Kevin O'Connell",4],"NE":["Mike Vrabel",7],"NO":["Kellen Moore",1],"NYG":["John Harbaugh",18],"NYJ":["Aaron Glenn",1],"PHI":["Nick Sirianni",5],"PIT":["Mike McCarthy",18],"SEA":["Mike Macdonald",2],"SF":["Kyle Shanahan",9],"TB":["Todd Bowles",9],"TEN":["Robert Saleh",4],"WSH":["Dan Quinn",8]};
+/* NFL divisions — ESPN's feed doesn't expose this directly, so it's hardcoded
+   (stable, only changes on realignment). Used for the divisional-game under lean. */
+const NFL_DIVISION={
+  BUF:"AFCE",MIA:"AFCE",NE:"AFCE",NYJ:"AFCE", BAL:"AFCN",CIN:"AFCN",CLE:"AFCN",PIT:"AFCN",
+  HOU:"AFCS",IND:"AFCS",JAX:"AFCS",TEN:"AFCS", DEN:"AFCW",KC:"AFCW",LAC:"AFCW",LV:"AFCW",
+  DAL:"NFCE",NYG:"NFCE",PHI:"NFCE",WSH:"NFCE", CHI:"NFCN",DET:"NFCN",GB:"NFCN",MIN:"NFCN",
+  ATL:"NFCS",CAR:"NFCS",NO:"NFCS",TB:"NFCS", ARI:"NFCW",LAR:"NFCW",SF:"NFCW",SEA:"NFCW"
+};
+
+/* ---------- week window: Monday 00:00 → Sunday 23:59 local ---------- */
+function weekWindow(){
+  const now=new Date();
+  const dow=(now.getDay()+6)%7;             // 0=Mon … 6=Sun
+  const mon=new Date(now); mon.setDate(now.getDate()-dow); mon.setHours(0,0,0,0);
+  const sun=new Date(mon); sun.setDate(mon.getDate()+6); sun.setHours(23,59,59,999);
+  return {mon,sun};
+}
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+
+/* ---------- math: win% → implied spread (σ = NFL margin sd) ---------- */
+function invNorm(p){
+  const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00],
+        b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01],
+        c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00],
+        d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+  const pl=0.02425; let q,r;
+  if(p<pl){q=Math.sqrt(-2*Math.log(p));return(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  if(p>1-pl){q=Math.sqrt(-2*Math.log(1-p));return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  q=p-0.5;r=q*q;
+  return(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+}
+/* Win% -> spread. Sigma is the standard deviation of final margin, and it is NOT
+   the same across leagues: college football has far more talent disparity and
+   much fatter margins than the NFL. Fitted against real DraftKings lines on a
+   live slate: CFB sigma 18 cut mean error 6.73 -> 4.45 pts. NFL's fit suggested
+   ~12.25 but on only 4 games, so we keep the well-established ~13.45 rather than
+   overfit a tiny sample. The 2% probability clamp stops the inverse-normal from
+   saturating on 99%+ blowouts, where it badly under-projects the real number. */
+const MARGIN_SIGMA={nfl:13.45,cfb:18};
+const impliedSpread=(p,lg)=>-invNorm(Math.min(.98,Math.max(.02,p)))*(MARGIN_SIGMA[lg]||13.45);
+
+/* ---------- persistence helpers (all namespaced, all best-effort) ---------- */
+function lsGet(k,fallback){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fallback; }catch(e){ return fallback; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+
+/* ---------- line movement: remember the FIRST line we ever saw this week per
+   game, so every later poll can show how far it's moved (a real sharp-money
+   signal). Keyed by the week string so it naturally resets Monday. ---------- */
+function lineOpens(weekKey){ const all=lsGet("edgeboard-opens-v1",{}); return all[weekKey]||{}; }
+function saveLineOpens(weekKey,opens){ const all=lsGet("edgeboard-opens-v1",{}); all[weekKey]=opens;
+  // keep only the current + previous week's worth of keys so this never grows forever
+  const keys=Object.keys(all); if(keys.length>3){ keys.sort().slice(0,keys.length-3).forEach(k=>delete all[k]); }
+  lsSet("edgeboard-opens-v1",all); }
+function applyLineMovement(games,weekKey){
+  const opens=lineOpens(weekKey); let changed=false;
+  games.forEach(g=>{
+    if(g.spread==null&&g.total==null) return;
+    const o=opens[g.id];
+    if(!o){ opens[g.id]={spread:g.spread,total:g.total}; changed=true; }
+    else{
+      if(o.spread!=null&&g.spread!=null) g.moveSpread=Math.round((g.spread-o.spread)*10)/10;
+      if(o.total!=null&&g.total!=null) g.moveTotal=Math.round((g.total-o.total)*10)/10;
+      g.openSpread=o.spread; g.openTotal=o.total;
+    }
+  });
+  if(changed) saveLineOpens(weekKey,opens);
+}
+
+/* ---------- fetch ---------- */
+/* All ESPN traffic goes through the Vercel functions in /api when the page is served
+   over http(s): one server does the fetching, caches it ~20s, and every phone shares
+   it. If the API is missing (file://, a static mirror) or fails, fall back to calling
+   ESPN directly — the board must never go blank because a proxy hiccupped. */
+const API=(typeof location!=="undefined"&&/^https?:$/.test(location.protocol))?"/api":null;
+let apiDown=false;
+async function jget(u){
+  if(API&&!apiDown){
+    try{
+      const r=await fetch(`${API}/espn?u=${encodeURIComponent(u)}`,{cache:"no-store"});
+      if(r.ok){ const b=await r.json(); if(b&&!b.error) return b; }
+      else if(r.status===404) apiDown=true;
+    }catch(e){ apiDown=true; }
+  }
+  const r=await fetch(u,{cache:"no-store"}); if(!r.ok) throw new Error(r.status); return r.json();
+}
+async function jgetMany(urls){
+  if(API&&!apiDown&&urls.length){
+    try{
+      const r=await fetch(`${API}/bulk`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({urls})});
+      if(r.ok){ const b=await r.json();
+        if(b&&Array.isArray(b.results)&&b.results.length===urls.length){
+          // anything the server couldn't get, fetch directly — never leave a hole
+          return Promise.all(b.results.map((x,i)=>x??fetch(urls[i],{cache:"no-store"}).then(rr=>rr.ok?rr.json():null).catch(()=>null)));
+        }
+      }
+      else if(r.status===404) apiDown=true;
+    }catch(e){ apiDown=true; }
+  }
+  return Promise.all(urls.map(u=>jget(u).catch(()=>null)));
+}
+
+function parseGame(e,lg){
+  const c=(e.competitions||[])[0]||{};
+  const cs=c.competitors||[];
+  const home=cs.find(x=>x.homeAway==="home")||cs[0]||{};
+  const away=cs.find(x=>x.homeAway==="away")||cs[1]||{};
+  const o=(c.odds||[])[0]||null;
+  const st=c.status||e.status||{};
+  const w=e.weather||{};
+  const v=c.venue||{};
+  return {
+    id:e.id, lg,
+    date:e.date, name:e.shortName||e.name,
+    home:{ab:home.team?.abbreviation||"?",nm:home.team?.shortDisplayName||"",logo:home.team?.logo,rec:(home.records||[])[0]?.summary||"",score:home.score,id:home.team?.id,rank:home.curatedRank?.current},
+    away:{ab:away.team?.abbreviation||"?",nm:away.team?.shortDisplayName||"",logo:away.team?.logo,rec:(away.records||[])[0]?.summary||"",score:away.score,id:away.team?.id,rank:away.curatedRank?.current},
+    spread:o?o.spread:null, details:o?o.details:null, total:o?o.overUnder:null,
+    mlHome:o?.moneyline?.home?.close?.odds||o?.homeTeamOdds?.moneyLine||null,
+    mlAway:o?.moneyline?.away?.close?.odds||o?.awayTeamOdds?.moneyLine||null,
+    favAb:o?(o.homeTeamOdds?.favorite?home.team?.abbreviation:away.team?.abbreviation):null,
+    leaders:{
+      home:(home.leaders||[]).map(l=>({cat:l.name,ath:l.leaders?.[0]?.athlete?.displayName,pos:l.leaders?.[0]?.athlete?.position?.abbreviation})).filter(x=>x.ath),
+      away:(away.leaders||[]).map(l=>({cat:l.name,ath:l.leaders?.[0]?.athlete?.displayName,pos:l.leaders?.[0]?.athlete?.position?.abbreviation})).filter(x=>x.ath)
+    },
+    state:st.type?.state||"pre", short:st.type?.shortDetail||"", period:st.period??null, clock:st.clock??null,
+    indoor:v.indoor===true, venueName:v.fullName||"",
+    temp:w.temperature??null, cond:(w.displayValue&&!/^\d+$/.test(String(w.displayValue)))?w.displayValue:"", condId:w.conditionId||null,
+    venue:v.fullName||"", neutral:c.neutralSite===true
+  };
+}
+
+async function loadSlate(){
+  const {mon,sun}=weekWindow();
+  document.getElementById("winLabel").innerHTML=
+    `${mon.toLocaleDateString(undefined,{month:"short",day:"numeric"})} – ${sun.toLocaleDateString(undefined,{month:"short",day:"numeric"})}<small>Betting week</small>`;
+  const range=`${ymd(mon)}-${ymd(sun)}`;
+  const out=[];
+  const jobs=[
+    jget(`${NFL}/scoreboard?dates=${range}&limit=100`).then(d=>(d.events||[]).forEach(e=>out.push(parseGame(e,"nfl")))).catch(()=>{}),
+    jget(`${CFB}/scoreboard?groups=80&dates=${range}&limit=400`).then(d=>(d.events||[]).forEach(e=>out.push(parseGame(e,"cfb")))).catch(()=>{})
+  ];
+  await Promise.all(jobs);
+  // if a league has nothing this window, pull its next games so the board isn't blank
+  if(!out.some(g=>g.lg==="nfl")){
+    try{ const d=await jget(`${NFL}/scoreboard?limit=100`); (d.events||[]).forEach(e=>{const g=parseGame(e,"nfl"); g.nextWeek=true; out.push(g);}); }catch(e){}
+  }
+  out.sort((a,b)=>new Date(a.date)-new Date(b.date));
+  applyLineMovement(out,range);
+  state.games=out; state.lastOdds=Date.now();
+  // in-progress games carry the live line — re-pull their details on every poll
+  const liveNow=out.filter(g=>g.state==="in");
+  if(liveNow.length){ liveNow.forEach(g=>{ if(!detailQueue.some(x=>x.id===g.id)) detailQueue.push(g); }); if(!detailRunning) runQueue(); }
+  render();
+  queueDetails();
+  recordStrongEdges();
+  gradeRecords();
+  refreshLearnedWeights();
+  // season-to-date results power our own ratings; refreshed at most hourly since
+  // they only change when games finish
+  if(!state.powerAt||Date.now()-state.powerAt>36e5){
+    state.powerAt=Date.now();
+    loadSeasonResults().then(res=>{
+      state.results=res;
+      state.power=buildPowerRatings(res);
+      render();
+    }).catch(()=>{});
+  }
+}
+
+/* summaries carry wind gust / precip / injuries / model — fetch progressively */
+let detailQueue=[], detailRunning=false;
+function queueDetails(){
+  const now=Date.now();
+  const cand=state.games
+    .filter(g=>g.state!=="post")
+    .filter(g=>g.state==="in" || g.lg==="nfl" || (!g.indoor && g.spread!=null))
+    .filter(g=>{const t=new Date(g.date)-now; return t< 8*864e5;})
+    // in-progress games first: they carry the live line and must never be cut by the cap
+    .sort((a,b)=>((a.state==="in")?0:1)-((b.state==="in")?0:1) || new Date(a.date)-new Date(b.date))
+    .slice(0,60);
+  detailQueue=cand.map(g=>g);
+  if(!detailRunning) runQueue();
+}
+async function runQueue(){
+  detailRunning=true;
+  while(detailQueue.length){
+    const viaApi=API&&!apiDown;
+    const batch=detailQueue.splice(0,viaApi?12:4);
+    const sumUrl=g=>`${g.lg==="nfl"?NFL:CFB}/summary?event=${g.id}`;
+    const oddsUrl=g=>g.state==="in"?`${CORE}/${CORE_LG[g.lg]}/events/${g.id}/competitions/${g.id}/odds`:null;
+    const want=[]; batch.forEach(g=>{ want.push(sumUrl(g)); if(oddsUrl(g)) want.push(oddsUrl(g)); });
+    const got=await jgetMany(want);
+    const byUrl=new Map(want.map((u,i)=>[u,got[i]]));
+    await Promise.all(batch.map(async g=>{
+      try{
+        const d=byUrl.get(sumUrl(g)); if(!d) throw new Error("no summary");
+        const core=oddsUrl(g)?byUrl.get(oddsUrl(g)):null;
+        const co=parseCoreOdds(core?.items);
+        const w=d.gameInfo?.weather||{};
+        const pred=d.predictor||null;
+        const inj=(d.injuries||[]).map(t=>({ab:t.team?.abbreviation,list:(t.injuries||[]).map(i=>({
+          nm:i.athlete?.displayName, pos:i.athlete?.position?.abbreviation||"", st:i.status, part:i.details?.type||""}))}));
+        // form + rest: lastFiveGames gives each team's most recent result + date,
+        // so we can read a hot/cold streak and days since their last game.
+        const form={};
+        (d.lastFiveGames||[]).forEach(t=>{
+          const ab=t.team?.abbreviation; const evs=(t.events||[]).slice(-5);
+          const lastDate=evs.length?new Date(evs[evs.length-1].gameDate):null;
+          // Only trust CURRENT-SEASON games for streak/pace. ESPN's "last 5 games" is
+          // just the last 5 played, so early in a season it's mostly (or entirely) LAST
+          // season's games — including a playoff run that ran into January.
+          //
+          // Anchor to THIS game's kickoff, not to gaps between historical games. An
+          // earlier attempt looked for a >45-day gap *within* the list and failed badly:
+          // a team whose last 5 were Nov 29 -> Jan 20 has no internal gap over 25 days,
+          // so every one of those stale games was treated as current form. The real
+          // offseason gap is between the last listed game and the upcoming one, which
+          // by definition isn't in the list. A season spans ~5 months, so anything more
+          // than 150 days before kickoff belongs to a previous season.
+          const kickoff=new Date(g.date);
+          const curSeasonEvs=evs.filter(x=>{
+            const age=(kickoff-new Date(x.gameDate))/864e5;
+            return age>0&&age<=150;
+          });
+          const wins=curSeasonEvs.filter(x=>x.gameResult==="W").length;
+          const streak=[]; for(let i=curSeasonEvs.length-1;i>=0;i--){ if(streak.length&&streak[streak.length-1]!==curSeasonEvs[i].gameResult) break; streak.push(curSeasonEvs[i].gameResult); }
+          // scoring pace: points this team scored / allowed, from their own perspective,
+          // using the home/away score fields directly (no string-parsing the "23-10" display).
+          // Requires 2+ real current-season games — a single game is too noisy to call a "pace".
+          let pf=0,pa=0,n=0;
+          curSeasonEvs.forEach(x=>{
+            const isHome=x.atVs==="vs"; const hs=Number(x.homeTeamScore),as=Number(x.awayTeamScore);
+            if(Number.isNaN(hs)||Number.isNaN(as)) return;
+            pf+=isHome?hs:as; pa+=isHome?as:hs; n++;
+          });
+          // A "recent form" read needs a real sample. Two games into a season the
+          // averages swing wildly on one blowout, so pace/matchup stay silent until
+          // there are MIN_FORM_GAMES current-season games to average over.
+          form[ab]={wins,of:curSeasonEvs.length,lastDate,streakLen:streak.length,streakType:streak[0]||null,
+            avgFor:n>=MIN_FORM_GAMES?pf/n:null, avgAgainst:n>=MIN_FORM_GAMES?pa/n:null};
+        });
+        // against-the-spread trend — empty early season, populates as games are played;
+        // written defensively so it just starts working once ESPN fills it in.
+        const ats={};
+        (d.againstTheSpread||[]).forEach(t=>{
+          const ab=t.team?.abbreviation; const rec=(t.records||[])[0];
+          if(rec&&rec.stats){
+            const w=rec.stats.find(s=>s.name==="wins")?.value, l=rec.stats.find(s=>s.name==="losses")?.value;
+            if(w!=null&&l!=null&&(w+l)>=3) ats[ab]={w,l};
+          }
+        });
+        const pc=(d.pickcenter||[])[0]||{};
+        const national=(d.broadcasts||[]).some(b=>b.market?.type==="National"&&b.isNational);
+        state.detail[g.id]={gust:w.gust??null,precip:w.precipitation??null,temp:w.temperature??g.temp,
+          indoor:d.gameInfo?.venue?.indoor===true||g.indoor, pred, inj, form, ats, national, got:true,
+          overOdds:pc.overOdds??null, underOdds:pc.underOdds??null, spreadOdds:pc.spreadOdds??null,
+          homeSpreadOdds:pc.homeTeamOdds?.spreadOdds??null, awaySpreadOdds:pc.awayTeamOdds?.spreadOdds??null,
+          // pregame closer (scoreboard drops it at kickoff) and the live line, if any
+          preSpread:co.pre?.spread??pc.spread??null, preTotal:co.pre?.total??pc.overUnder??null,
+          liveSpread:co.live?.spread??null, liveTotal:co.live?.total??null, liveDetails:co.live?.details??null};
+      }catch(e){ state.detail[g.id]={got:true,err:true}; }
+    }));
+    render();
+    await new Promise(r=>setTimeout(r,viaApi?40:220));
+  }
+  detailRunning=false;
+}
+
+/* ================= OPPONENT-ADJUSTED POWER RATINGS =================
+   The board's biggest methodological weakness was that pace/matchup used RAW
+   scoring averages: a team putting up 35 a game against cupcakes looked identical
+   to one doing it against real defenses. This fixes that.
+
+   Method: a simplified iterative (Massey-style) rating. Seed every team with its
+   average scoring margin, then repeatedly re-solve each team's rating as
+   "average of (margin + the rating of who they played)". Beating good teams pulls
+   you up; running up numbers on bad ones doesn't. Converges in a handful of passes.
+
+   Deliberately degrades: early in a season there are barely any results, so
+   ratings stay null and every consumer falls back to what it did before rather
+   than pretending to know something. MIN_RATED_GAMES guards that. */
+/* Walk-forward backtest of our OWN ratings vs the closing line (2025, no lookahead):
+   NFL  weeks 2-9: 40% ATS (n=57)  weeks 10+: 57% (n=70)   at a 3+ pt disagreement
+   CFB  weeks 2-5: 49% (n=68)      weeks 6+:  55% (n=309)
+   Disagreements of 6+ points LOST in both leagues (NFL 43%, CFB 51%): that far from
+   the market, the market knows something (QB, injury) the ratings do not. So the
+   ratings edge is gated on sample size and capped on distance. */
+const RATINGS_EDGE_MIN_N={nfl:9,cfb:5};  // games BOTH teams need before a ratings edge is claimed
+const RATINGS_STRONG_N=9;                 // ...and before it can be called strong
+const RATINGS_GAP_MIN=3;                  // points of disagreement with the market to fire
+const RATINGS_TOO_FAR=6;                  // beyond this the model is probably missing news — no bet
+const MIN_RATED_GAMES=3;      // a team needs this many results before it gets a rating
+const HFA={nfl:2.0,cfb:2.5};  // home-field advantage in points (standard figures)
+async function loadSeasonResults(){
+  const now=new Date(), yr=now.getFullYear();
+  const start=`${yr}0801`, end=ymd(now);
+  const out=[];
+  const grab=async(base,lg,extra)=>{
+    try{
+      const d=await jget(`${base}/scoreboard?dates=${start}-${end}&limit=900${extra||""}`);
+      (d.events||[]).forEach(e=>{
+        const c=(e.competitions||[])[0]||{};
+        if((c.status?.type?.state)!=="post") return;
+        const cs=c.competitors||[];
+        const h=cs.find(x=>x.homeAway==="home"), a=cs.find(x=>x.homeAway==="away");
+        const hs=Number(h?.score), as=Number(a?.score);
+        if(!h||!a||Number.isNaN(hs)||Number.isNaN(as)) return;
+        out.push({lg,home:h.team?.abbreviation,away:a.team?.abbreviation,hs,as,neutral:c.neutralSite===true});
+      });
+    }catch(e){}
+  };
+  await Promise.all([grab(NFL,"nfl",""),grab(CFB,"cfb","&groups=80")]);
+  return out;
+}
+function buildPowerRatings(results){
+  const teams={};
+  results.forEach(r=>{
+    const hAdj=r.neutral?0:(HFA[r.lg]||2);
+    // margin from each side's perspective, with home advantage removed
+    (teams[r.home]=teams[r.home]||{lg:r.lg,games:[]}).games.push({opp:r.away,margin:(r.hs-r.as)-hAdj,pf:r.hs,pa:r.as});
+    (teams[r.away]=teams[r.away]||{lg:r.lg,games:[]}).games.push({opp:r.home,margin:(r.as-r.hs)+hAdj,pf:r.as,pa:r.hs});
+  });
+  const rating={};
+  Object.entries(teams).forEach(([t,v])=>{ rating[t]=v.games.reduce((a,g)=>a+g.margin,0)/v.games.length; });
+  // iterate: your rating is your margin plus the strength of who you played
+  for(let pass=0;pass<12;pass++){
+    const next={};
+    Object.entries(teams).forEach(([t,v])=>{
+      next[t]=v.games.reduce((a,g)=>a+g.margin+(rating[g.opp]||0),0)/v.games.length;
+    });
+    // re-center each league at 0 so ratings stay comparable within a league
+    const byLg={};
+    Object.entries(teams).forEach(([t,v])=>{ (byLg[v.lg]=byLg[v.lg]||[]).push(t); });
+    Object.values(byLg).forEach(list=>{
+      const mean=list.reduce((a,t)=>a+next[t],0)/list.length;
+      list.forEach(t=>next[t]-=mean);
+    });
+    Object.assign(rating,next);
+  }
+  const out={};
+  Object.entries(teams).forEach(([t,v])=>{
+    if(v.games.length>=MIN_RATED_GAMES){
+      const sos=v.games.reduce((a,g)=>a+(rating[g.opp]||0),0)/v.games.length;
+      out[t]={rating:Math.round(rating[t]*10)/10, n:v.games.length, sos:Math.round(sos*10)/10,
+        pf:v.games.reduce((a,g)=>a+g.pf,0)/v.games.length,
+        pa:v.games.reduce((a,g)=>a+g.pa,0)/v.games.length};
+    }
+  });
+  return out;
+}
+
+/* ================= LEARNED SIGNAL WEIGHTS =================
+   SIGNAL_WEIGHT is my hand-assigned prior. Once a signal has a real graded
+   sample, let its OWN measured results move the weight — so the board stops
+   trusting my judgment and starts trusting the evidence. Capped so a hot or
+   cold streak can't swing a signal wildly on a small sample. */
+/* 2025 NFL regular season backtest: 272 games, real ESPN BET closing lines.
+   These are the MEASURED hit rates of the simple rule behind each signal, and they
+   seed effectiveWeight() until the board has its own live sample. Break-even at
+   standard -110 juice is 52.4%. Weather signals are ABSENT on purpose: ESPN strips
+   forecast data from completed games, so they cannot be backtested this way. */
+const BACKTEST_2025={
+ nfl:{ // 272 regular-season games, real closing lines
+  homedog:   {n:111,pct:52.3,note:"home dogs ATS — right at break-even, not the edge folklore claims"},
+  divisional:{n:96, pct:52.1,note:"division games UNDER — break-even; the 'tighter/lower' story barely shows"},
+  rest:      {n:41, pct:48.8,note:"rested team ATS — NO edge last season, slightly negative"},
+  keynumber: {n:21, pct:52.4,note:"dog on a 3/7 number — thin sample, coin flip"},
+  shortprep: {n:20, pct:50.0,note:"<=4 days rest UNDER — coin flip on a thin sample"},
+  base_over: {n:272,pct:52.6,note:"ALWAYS OVER beat the vig last season — the board's weather lean is UNDER, so it fights the base rate"},
+  fav10:     {n:31, pct:58.1,note:"favorites of 10+ COVERED 58% — do not blindly fade big NFL favorites"},
+  ratings:   {n:70, pct:57.1,note:"OUR power-rating line vs the closer, 3+ pt disagreement, week 10+ (both teams 9+ games) — walk-forward, no lookahead"},
+  ratings_early:{n:57,pct:40.4,note:"same rule weeks 2-9 — WORSE than a coin flip, which is why no NFL ratings edge is claimed before both teams have 9 games"},
+  ratings_far:{n:56,pct:42.9,note:"disagree with the market by 6+ pts — LOSES; that far off, the market knows something we don't (capped, never bet)"}
+ },
+ cfb:{ // 883 FBS regular-season games, real closing lines — the leagues do NOT share priors
+  rank:      {n:79, pct:54.4,note:"ranked team laying 24+ vs unranked -> DOG covered 54.4%; at 28+ it was 58.9% (n=56). Generic 28+ favorites were 47.9% — the edge is the ranked-vs-unranked part, not the spread size"},
+  rankclash: {n:50, pct:62.0,note:"ranked vs ranked -> UNDER hit 62% — two real defenses, tighter game scripts"},
+  hightotal: {n:116,pct:53.4,note:"closing total 60+ -> UNDER 53.4% — big numbers slightly overshoot"},
+  homedog:   {n:290,pct:50.0,note:"college home dogs ATS — dead coin flip, no edge at all"},
+  base_over: {n:883,pct:49.3,note:"ALWAYS OVER did NOT work in college (49.3%) — opposite of the NFL, so the NFL over-lean is never applied here"},
+  fav28:     {n:119,pct:47.9,note:"favorites of 28+ (any teams) covered only 47.9% — but see 'rank': the ranked ones are the ones to fade"},
+  ratings:   {n:309,pct:55.0,note:"OUR power-rating line vs the closer, 3+ pt disagreement, week 6+ — walk-forward, no lookahead; 59% once teams have 9+ games"},
+  ratings_early:{n:68,pct:48.5,note:"same rule weeks 2-5 — no edge; ratings need ~5 games per team before they say anything"},
+  ratings_far:{n:213,pct:50.7,note:"disagree with the market by 6+ pts — no edge; capped, never bet"}
+ }
+};
+const LEARN_MIN=8;   // graded calls before a signal's own results count at all
+function effectiveWeight(cat,lg){
+  const base=SIGNAL_WEIGHT[cat]||1;
+  const live=(state.learned||{})[cat];
+  // Prefer the board's own graded sample; until it exists, use the 2025 backtest
+  // as the prior — measured evidence beats my hand-assigned guess every time.
+  // Priors are per-league: college and the NFL disagree on several of these
+  // (the NFL leaned OVER, college leaned UNDER), so an NFL number never seeds a CFB edge.
+  const prior=(BACKTEST_2025[lg]||{})[cat]||null;
+  const st=(live&&live.n>=LEARN_MIN)?live:prior;
+  if(!st) return base;
+  // 52.4% is break-even at -110; scale between 0.6x and 1.4x of the prior
+  const mult=Math.max(0.6,Math.min(1.4,1+(st.pct-52.4)/100));
+  return base*mult;
+}
+/* ================= STAKE SIZING =================
+   A 57% signal and a 52% signal should not be bet the same. Each play gets an
+   ESTIMATED hit probability from the best evidence available for its signals —
+   the board's own graded sample, else the 2025 backtest, else a conservative
+   default by signal weight — and a fractional Kelly stake off that number.
+   Quarter-Kelly on purpose: full Kelly assumes the probability is exactly right,
+   and these are estimates from one season. */
+const DEFAULT_PROB_BY_WEIGHT={3:55,2:53.5,1:52};   // hand-set, used only when nothing measured exists
+const PROB_CAP=60;          // no play is ever presented above 60% — nothing here has earned that
+const KELLY_FRACTION=0.25;
+const BEST_MIN_PROB=53.5;   // "best bets" needs a real margin over the 52.4% break-even
+function catProb(cat,lg){
+  const live=(state.learned||{})[cat];
+  if(live&&live.n>=LEARN_MIN) return {p:live.pct,src:"live"};
+  const prior=(BACKTEST_2025[lg]||{})[cat];
+  if(prior) return {p:prior.pct,src:"backtest"};
+  return {p:DEFAULT_PROB_BY_WEIGHT[SIGNAL_WEIGHT[cat]||1],src:"prior"};
+}
+function playProb(cats,lg){
+  const list=[...new Set(cats)].filter(c=>c!=="stack"&&c!=="conflict").map(c=>catProb(c,lg));
+  if(!list.length) return null;
+  list.sort((a,b)=>b.p-a.p);
+  // the strongest signal sets the base; each extra agreeing signal adds HALF its
+  // own margin over break-even (they are not fully independent), capped hard
+  const extra=list.slice(1).reduce((a,c)=>a+Math.max(0,c.p-52.4)*0.5,0);
+  const p=Math.min(PROB_CAP,list[0].p+extra);
+  return {p:Math.round(p*10)/10,src:list[0].src,n:list.length};
+}
+function kellyStake(p,odds){
+  const b=americanToDecimal(odds||-110)-1, q=p/100;
+  const f=(q*b-(1-q))/b;
+  if(!(f>0)) return {f:0,pct:0,dollars:0};
+  const frac=f*KELLY_FRACTION;
+  return {f:frac,pct:Math.round(frac*1000)/10,dollars:Math.round(frac*(state.bankroll||0))};
+}
+// The single best STRONG directional play on a game, with its estimated probability.
+function bestPlay(g){
+  const E=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
+  const byDir={}; E.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
+  let best=null;
+  Object.entries(byDir).forEach(([dir,list])=>{
+    const cats=[...new Set(list.map(e=>e.cat))];
+    const pr=playProb(cats,g.lg); if(!pr) return;
+    if(!best||pr.p>best.p) best={dir,cats,p:pr.p,src:pr.src,lead:list[0],stake:kellyStake(pr.p,-110)};
+  });
+  return best;
+}
+function bestChip(b){
+  if(!b) return "";
+  const src=b.src==="live"?"from this board's own record":b.src==="backtest"?"2025 backtest":"default prior";
+  return `<div class="bestchip${b.p>=BEST_MIN_PROB?" good":""}"><b>${b.p}%</b> est. · ${b.stake.dollars>0?`¼-Kelly <b>$${b.stake.dollars}</b> (${b.stake.pct}% of $${state.bankroll})`:"no stake — under break-even"} <span class="src">${src}</span></div>`;
+}
+function refreshLearnedWeights(){
+  try{ state.learned={}; signalStats(lsGet("edgeboard-record-v1",[])).forEach(s=>{ state.learned[s.cat]={n:s.n,pct:s.pct}; }); }catch(e){}
+}
+
+/* ================= PROJECTED LINE MODEL =================
+   What SHOULD this line be? Built from the best inputs available for each game,
+   with the basis and confidence reported honestly rather than emitting a
+   confident-looking number from thin air.
+
+   SPREAD (home-relative, negative = home favored):
+     base  = ESPN's matchup model win% -> implied spread (validated to within
+             0.3 pts of a real DK line), because it works even in week 1 when
+             there's no current-season form yet.
+     adj   = QB ruled out (±6.5, the standard book adjustment), altitude,
+             rest edge.
+   TOTAL:
+     base  = both teams' actual scoring pace when there are enough games,
+             otherwise a league baseline (NFL vs CFB score very differently).
+     adj   = wind (the big one), precipitation, deep cold, dome, altitude, QB out.
+
+   The point-magnitudes below are industry-standard rules of thumb, NOT
+   regression-fitted coefficients — that's stated in the UI so nobody mistakes
+   this for a trained model. */
+const LEAGUE_BASE_TOTAL={nfl:44.5,cfb:55.5};
+const QB_OUT_PTS=6.5;
+function projectLine(g){
+  const d=state.detail[g.id]||{};
+  const indoor=d.indoor||g.indoor;
+  const gust=d.gust, precip=d.precip, temp=d.temp??g.temp;
+  const form=d.form||{};
+  const notes=[]; let conf=0;
+
+  /* ---- spread ---- */
+  let spread=null, spreadBasis=null;
+  const hp=d.pred?parseFloat(d.pred.homeTeam?.gameProjection):NaN;
+  const espnSpread=!isNaN(hp)?impliedSpread(hp/100,g.lg):null;
+  // Our OWN opponent-adjusted rating, independent of ESPN's model. When both
+  // exist we blend them — two independent estimates beat either alone, and it
+  // stops the projection from being just a restatement of ESPN's opinion.
+  const P=state.power||{};
+  const hr=P[g.home.ab], ar=P[g.away.ab];
+  let ratingSpread=null;
+  if(hr&&ar){
+    ratingSpread=-((hr.rating-ar.rating)+(g.neutral?0:(HFA[g.lg]||2)));
+  }
+  // Gate our ratings' right to claim an edge (see RATINGS_* above)
+  let mature=false, tooFar=false, ratingGap=null;
+  if(hr&&ar){
+    mature=Math.min(hr.n,ar.n)>=(RATINGS_EDGE_MIN_N[g.lg]||9);
+    if(g.spread!=null){ ratingGap=Math.round((ratingSpread-g.spread)*2)/2; tooFar=Math.abs(ratingGap)>=RATINGS_TOO_FAR; }
+    if(!mature) notes.push(`Ratings are early-season (${hr.n}/${ar.n} games) — backtested, our line was worse than a coin flip vs the market at this stage, so no spread edge is claimed from it yet.`);
+    else if(tooFar) notes.push(`Our ratings are ${Math.abs(ratingGap)} points off the market. That far apart, the market is usually pricing news the ratings can't see (QB, injuries) — backtested 6+ point disagreements lost, so no spread edge is claimed.`);
+  }
+  if(ratingSpread!=null&&espnSpread!=null){
+    spread=(ratingSpread*0.5)+(espnSpread*0.5);
+    spreadBasis=`blend of our opponent-adjusted ratings (${hr.n}/${ar.n} games) and ESPN's model`;
+    conf+=3;
+  } else if(ratingSpread!=null){
+    spread=ratingSpread; spreadBasis=`our opponent-adjusted power ratings (${hr.n}/${ar.n} games)`; conf+=2;
+  } else if(espnSpread!=null){
+    spread=espnSpread; spreadBasis=`ESPN matchup model (${g.lg==="nfl"?"NFL":"college"}-calibrated) — not enough results yet for our own ratings`; conf+=2;
+  }
+  if(spread!=null){
+    // A QB ruled out is the biggest roster swing books price — but not every QB is
+    // worth the same. If the injured player is that team's actual passing leader,
+    // it's the full hit; a backup already listed carries much less.
+    (d.inj||[]).forEach(t=>{
+      const side=t.ab===g.home.ab?"home":(t.ab===g.away.ab?"away":null);
+      const lead=(g.leaders?.[side]||[]);
+      (t.list||[]).forEach(p=>{
+        if(p.pos==="QB"&&/out|doubtful|injured reserve/i.test(p.st||"")){
+          const isStarter=lead.some(l=>l.cat==="passingLeader"&&l.ath===p.nm);
+          const hit=isStarter?QB_OUT_PTS:QB_OUT_PTS*0.45;
+          const homeHit=t.ab===g.home.ab;
+          spread+= homeHit? hit : -hit;
+          notes.push(`${t.ab} QB out (${isStarter?"team's passing leader":"not the listed leader — reduced"}): ${homeHit?"+":"−"}${hit.toFixed(1)} toward ${homeHit?g.away.ab:g.home.ab}`);
+        }
+        // a lead skill player out is smaller but real, and only counted when he's
+        // demonstrably the team's primary producer at that spot
+        if((p.pos==="RB"||p.pos==="WR")&&/out|doubtful|injured reserve/i.test(p.st||"")){
+          const key=p.pos==="RB"?"rushingLeader":"receivingLeader";
+          if(lead.some(l=>l.cat===key&&l.ath===p.nm)){
+            const homeHit=t.ab===g.home.ab;
+            spread+= homeHit? 1.5 : -1.5;
+            notes.push(`${t.ab} lead ${p.pos} out: ${homeHit?"+":"−"}1.5`);
+          }
+        }
+      });
+    });
+    if(ALTITUDE[g.venueName]){ spread-=1; notes.push("altitude: −1 toward the home side"); }
+    const hf=form[g.home.ab], af=form[g.away.ab];
+    if(hf&&af&&hf.lastDate&&af.lastDate){
+      const hr=(new Date(g.date)-new Date(hf.lastDate))/864e5, ar=(new Date(g.date)-new Date(af.lastDate))/864e5;
+      if(hr<=20&&ar<=20&&Math.abs(hr-ar)>=3){
+        const adj=(hr>ar)?-0.5:0.5;
+        spread+=adj; notes.push(`rest edge: ${adj<0?"−":"+"}0.5 toward ${adj<0?g.home.ab:g.away.ab}`);
+      }
+    }
+    spread=Math.round(spread*2)/2;   // book-style half-point rounding
+  }
+
+  /* ---- total ---- */
+  let total=null, totalBasis=null;
+  const hf=form[g.home.ab], af=form[g.away.ab];
+  const hpw=P[g.home.ab], apw=P[g.away.ab];
+  if(hpw&&apw){
+    // Opponent-adjusted: a team's raw points-for is inflated or suppressed by who
+    // they played, so pull each side back toward league average by their SOS.
+    const hAdjFor=hpw.pf-(hpw.sos*0.35), aAdjFor=apw.pf-(apw.sos*0.35);
+    const hAdjAg=hpw.pa+(hpw.sos*0.35), aAdjAg=apw.pa+(apw.sos*0.35);
+    total=(hAdjFor+aAdjAg+aAdjFor+hAdjAg)/2;
+    totalBasis=`opponent-adjusted scoring (${hpw.n}/${apw.n} games, strength of schedule ${hpw.sos>0?"+":""}${hpw.sos}/${apw.sos>0?"+":""}${apw.sos})`;
+    conf+=3;
+  } else if(hf&&af&&hf.avgFor!=null&&af.avgFor!=null){
+    total=(hf.avgFor+hf.avgAgainst+af.avgFor+af.avgAgainst)/2;
+    totalBasis=`both teams' raw scoring pace (${Math.min(hf.of,af.of)} games each) — not enough results yet to adjust for opponent quality`; conf+=2;
+  } else {
+    total=LEAGUE_BASE_TOTAL[g.lg]??46;
+    totalBasis=`${g.lg==="nfl"?"NFL":"college"} league baseline — not enough current-season games yet`;
+  }
+  if(indoor){ total+=1; notes.push("dome: +1 (no weather suppression)"); }
+  else{
+    if(gust!=null&&gust>10){ const cut=Math.min(6,(gust-10)*0.3); total-=cut; notes.push(`${gust} mph gusts: −${cut.toFixed(1)}`); conf+=1; }
+    if(precip!=null&&precip>=70){ total-=2; notes.push(`${precip}% precip: −2`); conf+=1; }
+    if(temp!=null&&temp<=25){ total-=2; notes.push(`${temp}°F: −2`); conf+=1; }
+    if(ALTITUDE[g.venueName]){ total+=2; notes.push("altitude: +2 (thin air)"); }
+  }
+  (d.inj||[]).forEach(t=>{(t.list||[]).forEach(p=>{
+    if(p.pos==="QB"&&/out|doubtful|injured reserve/i.test(p.st||"")){ total-=3; notes.push(`${t.ab} QB out: −3 to the total`); }
+  });});
+  total=Math.round(total*2)/2;
+
+  // On huge spreads the win%->line conversion is unreliable no matter how it's
+  // tuned (measured error is still ~9-14 pts out there), so we deliberately do
+  // NOT publish an "edge" against the book on blowout numbers. Claiming a
+  // 14-point edge on a -42.5 line would be the most harmful output on this page.
+  const blowout=(g.spread!=null&&Math.abs(g.spread)>=21)||(spread!=null&&Math.abs(spread)>=21);
+  const confidence=blowout?"low":(conf>=4?"high":conf>=2?"medium":"low");
+  const edgeOk=!blowout&&(ratingSpread==null||(mature&&!tooFar));
+  return {spread,spreadBasis,total,totalBasis,notes,confidence,blowout,mature,tooFar,ratingGap,
+    spreadEdge:(edgeOk&&spread!=null&&g.spread!=null)?Math.round((g.spread-spread)*2)/2:null,
+    totalEdge:(total!=null&&g.total!=null)?Math.round((g.total-total)*2)/2:null};
+}
+function fmtLine(v,homeAb,awayAb){
+  if(v==null) return "—";
+  if(v===0) return "PK";
+  return v<0?`${homeAb} ${v}`:`${awayAb} -${v}`;
+}
+
+/* ---------- the edge engine ----------
+   Every edge carries {k:"strong"|"lean", play, why, dir, cat}.
+   dir is what the pick is FOR, in a shape we can later grade and stack:
+     "UNDER" / "OVER"   -> graded against g.total
+     a team abbreviation -> graded against the spread (that team to cover)
+     null                -> informational only, not gradable, not stacked
+   cat is a short signal-type id (wind, precip, cold, qbout, altitude, model, steam…). */
+// Once a game is underway every pregame market is closed, so pregame signals
+// (juice, primetime, weather-on-the-total...) are no longer bets. Live games show
+// only the in-play signals.
+function edgesFor(g){
+  const E=edgesForRaw(g);
+  return g.state==="in"?E.filter(e=>e.cat==="livepace"||e.cat==="livespread"):E;
+}
+function edgesForRaw(g){
+  const d=state.detail[g.id]||{};
+  const E=[];
+  const indoor=d.indoor||g.indoor;
+  const gust=d.gust, precip=d.precip??d.precipitation, temp=d.temp??g.temp;
+  const total=g.total;
+
+  if(!indoor){
+    // WIND — the strongest, best-documented weather effect on scoring
+    if(gust!=null){
+      if(gust>=20) E.push({k:"strong",dir:"UNDER",cat:"wind",play:`UNDER ${total??""} — wind`,why:`Gusts to ${gust} mph. Deep passing and field goals fall off a cliff above 20 mph; this is the most reliable weather signal in football. Also fades the kicker and both QBs' passing props.`});
+      else if(gust>=15) E.push({k:"lean",dir:"UNDER",cat:"wind",play:`Lean UNDER ${total??""} — wind`,why:`Gusts to ${gust} mph. Enough to shorten the passing game and make long field goals dicey.`});
+    }
+    // PRECIP
+    if(precip!=null&&precip>=70){
+      const strong=(gust!=null&&gust>=12);
+      E.push({k:strong?"strong":"lean",dir:"UNDER",cat:"precip",play:`${strong?"":"Lean "}UNDER ${total??""} — wet`,why:`${precip}% precipitation chance${strong?` with ${gust} mph gusts`:""}. Wet ball means more runs, more drops, clock-burning drives. Boosts rushing-attempt props.`});
+    }
+    // COLD
+    if(temp!=null&&temp<=25) E.push({k:"lean",dir:"UNDER",cat:"cold",play:`Lean UNDER ${total??""} — cold`,why:`${temp}°F at kickoff. Hard ball, stiff hands, shorter kicks — scoring dips in the deep cold.`});
+  }
+
+  // INJURIES — QB out is the single biggest roster edge
+  const inj=d.inj||[];
+  inj.forEach(t=>{
+    const opp=t.ab===g.home.ab?g.away.ab:(t.ab===g.away.ab?g.home.ab:null);
+    (t.list||[]).forEach(p=>{
+      const outish=/out|doubtful|injured reserve/i.test(p.st||"");
+      if(!outish) return;
+      if(p.pos==="QB") E.push({k:"strong",dir:opp,cat:"qbout",play:`Fade ${t.ab} — QB out`,why:`${p.nm} (QB) listed ${p.st}${p.part?` (${p.part})`:""}. A backup QB is worth roughly a touchdown of line value and pulls the total down. Check whether the line already moved — if it hasn't, that's your edge.`});
+      else if(p.pos==="RB"||p.pos==="WR"||p.pos==="TE") E.push({k:"lean",dir:null,cat:"skillout",play:`${t.ab} down a starter (${p.pos})`,why:`${p.nm} (${p.pos}) listed ${p.st}${p.part?` (${p.part})`:""}. Watch the total and that player's prop market.`});
+    });
+  });
+
+  // STADIUM: altitude — the strongest read is on the home side vs the spread
+  const alt=ALTITUDE[g.venueName];
+  if(alt){
+    E.push({k:"lean",dir:g.home.ab,cat:"altitude",play:`Lean ${g.home.ab} — altitude`,why:`${g.venueName} sits at ${alt.toLocaleString()} ft. Thin air carries kicks farther and gasses out visiting legs by the 4th quarter — historically a boost for the home team, especially late.`});
+  }
+  // STADIUM: a dome team forced outside into real weather
+  if(!indoor && (gust>=12 || (temp!=null&&temp<=32) || (precip!=null&&precip>=50))){
+    [{ab:g.home.ab},{ab:g.away.ab}].forEach(t=>{
+      if(DOME_HOME_TEAMS.has(t.ab)){
+        const opp=t.ab===g.home.ab?g.away.ab:g.home.ab;
+        E.push({k:"lean",dir:opp,cat:"domefade",play:`Fade ${t.ab} in the elements`,why:`${t.ab} plays its home games in a dome and rarely faces real wind/cold/rain — that inexperience tends to show up when the conditions get rough.`});
+      }
+    });
+  }
+  // FORM: rest days (short week / bye-week edge) + hot/cold streaks
+  const form=d.form||{};
+  const gameDate=new Date(g.date);
+  [{ab:g.home.ab},{ab:g.away.ab}].forEach(t=>{
+    const f=form[t.ab]; if(!f||!f.lastDate) return;
+    const opp=t.ab===g.home.ab?g.away.ab:g.home.ab;
+    const restDays=Math.round((gameDate-f.lastDate)/864e5);
+    // only trust this within a plausible in-season gap — a season opener's "last game"
+    // is last year's finale, months back, and isn't a real rest/short-week signal.
+    const inSeason=restDays>0&&restDays<=20;
+    if(inSeason&&restDays>=10) E.push({k:"lean",dir:t.ab,cat:"rest",play:`${t.ab} extra rest`,why:`${restDays} days since their last game (bye week or rescheduling). Backtested on 2025 the rested side covered just 48.8% — no measurable edge — so this is context, not a reason to bet.`});
+    else if(inSeason&&restDays<=4) E.push({k:"lean",dir:opp,cat:"shortweek",play:`${t.ab} on a short week`,why:`Only ${restDays} day${restDays===1?"":"s"} of rest — short-week teams (Thursday games, rescheduled games) tend to look sluggish, especially on offense.`});
+    // streaks also require the minimum current-season sample — a "3-game skid" built
+    // partly from last season's games isn't this team's current form.
+    if(inSeason&&f.of>=MIN_FORM_GAMES&&f.streakLen>=3&&f.streakType==="L") E.push({k:"lean",dir:null,cat:"coldstreak",play:`${t.ab} is cold (${f.streakLen}-game skid)`,why:`Lost ${f.streakLen} straight this season. Public bettors often keep backing a name brand through a slide — check whether the line has actually adjusted for it.`});
+    if(inSeason&&f.of>=MIN_FORM_GAMES&&f.streakLen>=4&&f.streakType==="W") E.push({k:"lean",dir:null,cat:"hotstreak",play:`${t.ab} is hot (${f.streakLen}-game streak)`,why:`Won ${f.streakLen} straight this season. Momentum alone isn't an edge, but paired with a soft line it's worth a second look.`});
+  });
+  // RANKINGS mismatch (college, mostly) — an unranked team getting a small home number vs a ranked visitor
+  if(g.lg==="cfb"&&g.spread!=null){
+    const hr=g.home.rank,ar=g.away.rank;
+    // ESPN uses 99 as the "unranked" sentinel, NOT null — a plain truthiness check
+    // (!rank) reads 99 as "ranked". Verified against a real slate: 24 ranked-vs-
+    // unranked games existed but ZERO were ranked-home-underdogs, so the original
+    // rule was near-unfireable by construction. Replaced with the pattern that
+    // actually recurs (17 hits on that same slate): a ranked team laying a massive
+    // number against an unranked opponent.
+    const ranked=r=>typeof r==="number"&&r>=1&&r<=25;
+    const homeRankedBigFav=ranked(hr)&&!ranked(ar)&&g.spread<=-24;
+    const awayRankedBigFav=ranked(ar)&&!ranked(hr)&&g.spread>=24;
+    if(homeRankedBigFav||awayRankedBigFav){
+      const fav=homeRankedBigFav?g.home.ab:g.away.ab, dog=homeRankedBigFav?g.away.ab:g.home.ab;
+      const rk=homeRankedBigFav?hr:ar;
+      E.push({k:"lean",dir:dog,cat:"rank",play:`${dog} +${Math.abs(g.spread)} — huge-number dog`,
+        why:`${fav} (#${rk}) is laying ${Math.abs(g.spread)} against an unranked opponent. Enormous college spreads are hard to cover: winning teams empty the bench, call off the dogs in the 4th, and backdoor points are common. The favorite usually wins — covering by four touchdowns is a different question. Backtested on 2025: this exact spot cashed for the dog ${Math.abs(g.spread)>=28?"58.9% of the time at 28+ (n=56)":"54.4% of the time (n=79), and 58.9% once the number reaches 28"}.`});
+    }
+    // RANKED vs RANKED — two legitimate defenses and a conservative game script.
+    // 2025 backtest: the UNDER hit 62% in these games (31-19). Not thin, not folklore.
+    if(ranked(hr)&&ranked(ar)&&total!=null){
+      E.push({k:"lean",dir:"UNDER",cat:"rankclash",play:`Lean UNDER ${total} — ranked vs ranked`,
+        why:`#${hr} ${g.home.ab} vs #${ar} ${g.away.ab}. Top-25 matchups tend to be coached tighter and played closer to the vest than the shootouts the totals market expects. On the 2025 season the UNDER hit 62% (31-19) in ranked-vs-ranked games — the strongest soft signal in the college backtest.`});
+    }
+    // HIGH TOTAL — 60+ closing totals went UNDER 53.4% (62-54) in 2025. Modest, kept as a light lean.
+    if(total!=null&&total>=60){
+      E.push({k:"lean",dir:"UNDER",cat:"hightotal",play:`Lean UNDER ${total} — 60+ total`,
+        why:`Totals of 60 or more slightly overshoot: in 2025 they went under 53.4% of the time (n=116). Small lean on its own; matters more when it stacks with something real.`});
+    }
+  }
+  // DIVISIONAL GAME — familiarity breeds tighter, lower-scoring games (a real,
+  // long-documented NFL trend: division rivals know each other's schemes cold).
+  if(g.lg==="nfl"&&NFL_DIVISION[g.home.ab]&&NFL_DIVISION[g.home.ab]===NFL_DIVISION[g.away.ab]){
+    E.push({k:"lean",dir:"UNDER",cat:"divisional",play:`Lean UNDER ${total??""} — division game`,why:`${g.home.ab} and ${g.away.ab} play twice a year and know each other's tendencies cold. Honest note: on the 2025 season the divisional UNDER hit 52.1% — break-even, not the strong trend it's usually sold as. Kept as a light lean only.`});
+  }
+  // SHORT PREP — Thursday (or a CFB weeknight) game gives BOTH teams less practice
+  // time, a distinct effect from either team's individual rest (that's cat "rest"
+  // above). This is specifically a total-scoring effect, well documented for TNF.
+  {
+    // A Thursday game is only a SHORT WEEK if the teams actually played a few days
+    // earlier. In week 1 they've had a full offseason to prepare — the calendar day
+    // alone means nothing. Require real evidence of a recent game before firing.
+    const dow=gameDate.getDay();   // 0=Sun … 4=Thu
+    if(dow===4){
+      const recent=[g.home.ab,g.away.ab].map(ab=>{
+        const f=(d.form||{})[ab];
+        if(!f||!f.lastDate) return null;
+        return (gameDate-new Date(f.lastDate))/864e5;
+      }).filter(v=>v!=null&&v>0);
+      const onShortRest=recent.length>0&&recent.some(days=>days<=5);
+      if(onShortRest) E.push({k:"lean",dir:"UNDER",cat:"shortprep",play:`Lean UNDER ${total??""} — short-prep game`,why:`Thursday kickoff on ${Math.round(Math.min(...recent))} days' rest. Shortened install weeks drag total scoring down across the league — but note this only counts because these teams genuinely just played; a season-opening Thursday game is not a short week.`});
+    }
+  }
+  // NEUTRAL SITE — informational: the "home" label doesn't carry real home-field here.
+  if(g.neutral) E.push({k:"lean",dir:null,cat:"neutral",play:`Neutral site — no real home field`,why:`This is a neutral-site game. Whatever "home" designation the market uses for labeling, neither team gets true crowd/travel home-field advantage — worth remembering if the line looks built around it.`});
+
+  // PACE vs TOTAL — compare each team's own recent scoring pace (last 5 games,
+  // for/against from their perspective) to the total actually posted for THIS game.
+  {
+    const hf=form[g.home.ab], af=form[g.away.ab];
+    if(hf&&af&&hf.avgFor!=null&&af.avgFor!=null&&total!=null){
+      const projected=(hf.avgFor+hf.avgAgainst+af.avgFor+af.avgAgainst)/2;   // avg combined pace
+      const gap=total-projected;
+      if(Math.abs(gap)>=6){
+        const dir=gap>0?"UNDER":"OVER";
+        E.push({k:Math.abs(gap)>=10?"strong":"lean",dir,cat:"pace",
+          play:`Lean ${dir} ${total} — pace mismatch`,
+          why:`Based on each team's last ${Math.min(hf.of,af.of)} game${Math.min(hf.of,af.of)===1?"":"s"} this season, this matchup projects to about ${projected.toFixed(1)} combined points — the posted total of ${total} is ${Math.abs(gap).toFixed(1)} points ${gap>0?"higher":"lower"} than their recent scoring pace.`});
+      }
+    }
+    // MATCHUP — a side read: one team's recent offense clearly outpaces the other's
+    // recent defense (and vice versa), independent of the raw total.
+    if(hf&&af&&hf.avgFor!=null&&af.avgFor!=null&&g.spread!=null){
+      const homeEdge=(hf.avgFor-af.avgAgainst)-(af.avgFor-hf.avgAgainst);   // + favors home
+      if(Math.abs(homeEdge)>=8){
+        const side=homeEdge>0?g.home.ab:g.away.ab;
+        E.push({k:"lean",dir:side,cat:"matchup",play:`${side} — recent form matchup`,why:`Comparing each team's last ${Math.min(hf.of,af.of)} game${Math.min(hf.of,af.of)===1?"":"s"} this season, ${side}'s recent offense/defense balance projects noticeably better in this matchup than the other side's.`});
+      }
+    }
+  }
+  // ATS TREND — once ESPN's against-the-spread data populates (usually empty in
+  // week 1), a team on a strong cover/fail streak is worth a look either way.
+  const ats=d.ats||{};
+  [{ab:g.home.ab},{ab:g.away.ab}].forEach(t=>{
+    const a=ats[t.ab]; if(!a) return;
+    const total5=a.w+a.l; if(total5<3) return;
+    if(a.w/total5>=0.8) E.push({k:"lean",dir:t.ab,cat:"ats",play:`${t.ab} covering (${a.w}-${a.l} ATS)`,why:`${t.ab} is ${a.w}-${a.l} against the spread recently — the market may be slow to fully price in a team that's consistently beating its number.`});
+    else if(a.l/total5>=0.8) E.push({k:"lean",dir:t.ab===g.home.ab?g.away.ab:g.home.ab,cat:"ats",play:`Fade ${t.ab} (${a.w}-${a.l} ATS)`,why:`${t.ab} is just ${a.w}-${a.l} against the spread recently — public bettors often keep laying/taking the same number a struggling team is failing to hit.`});
+  });
+  // CHALK — a very heavy moneyline favorite. Informational, not a specific pick:
+  // extreme favorites are structurally the worst value on the board (you risk a
+  // lot to win little, and upsets happen more than the price implies).
+  {
+    const favML = g.favAb===g.home.ab ? g.mlHome : (g.favAb===g.away.ab ? g.mlAway : null);
+    if(typeof favML==="number"&&favML<=-450){
+      E.push({k:"lean",dir:null,cat:"chalk",play:`Heavy chalk: ${g.favAb} ${favML}`,why:`Laying ${Math.abs(favML)} to win 100 is poor risk/reward even when the favorite is real. If you like ${g.favAb}, the spread is almost always better value than the moneyline here.`});
+    }
+  }
+  // HOME UNDERDOG — a mild but real, long-tracked ATS trend: teams favored to LOSE
+  // that still get to sleep in their own beds cover slightly more than a coin flip
+  // over large samples. Weak on its own — kept as a lean, not a strong.
+  if(g.spread!=null&&g.spread>0){
+    E.push({k:"lean",dir:g.home.ab,cat:"homedog",play:`${g.home.ab} — home underdog`,why:`${g.home.ab} is getting points at home (+${g.spread}). Backtested on the 2025 NFL season, home dogs covered 52.3% — essentially break-even after juice. A well-worn trend that's real but thin; it only matters here when other signals point the same way.`});
+  }
+  // NATIONAL BROADCAST — informational only: primetime/national exposure tends to
+  // draw disproportionate public money onto the favorite and the over, which is
+  // WHY sharp bettors pay closer attention to these lines rather than a reason to
+  // pick a side by itself.
+  if(d.national) E.push({k:"lean",dir:null,cat:"primetime",play:`National broadcast`,why:`This game is on national TV. Public money skews toward the favorite and the over on these — if you're already leaning the other way for other reasons, that's one more reason the line might be soft there.`});
+  // KEY NUMBERS — 3 and 7 are by far the most common NFL margins of victory, so a
+  // spread or total landing exactly on one is more valuable to buy/sell off of and
+  // a push is a real possibility. Purely informational, not a side pick.
+  if(g.lg==="nfl"){
+    const keySpread=Math.abs(g.spread)===3||Math.abs(g.spread)===7;
+    if(keySpread) E.push({k:"lean",dir:null,cat:"keynumber",play:`Spread sits on a key number (${Math.abs(g.spread)})`,why:`3 and 7 are the most common margins of victory in the NFL. A spread landing exactly there means a push is realistic, and a half-point off it (if you can find one) is worth more than usual.`});
+  }
+  // EXTREME HEAT — informational: real fatigue/hydration effect late in games, but
+  // the literature doesn't support a clean over/under direction the way cold does,
+  // so this stays a flag rather than a pick.
+  if(!indoor&&temp!=null&&temp>=95) E.push({k:"lean",dir:null,cat:"heat",play:`Extreme heat — ${temp}°F`,why:`Hydration and conditioning become real factors by the 4th quarter in heat like this. It doesn't push scoring a clean direction the way cold does, but it's worth knowing before you bet a team with a short bench or a team not used to it.`});
+
+  // JUICE SKEW — books often move the PRICE before they move the NUMBER. If one
+  // side of the total or spread costs noticeably more to bet than the other, that's
+  // an early read on where money is already going, before it shows up as steam.
+  if(d.overOdds!=null&&d.underOdds!=null){
+    const dOver=americanToDecimal(d.overOdds), dUnder=americanToDecimal(d.underOdds);
+    if(Math.abs(dOver-dUnder)>=0.05){
+      const dir=dOver<dUnder?"OVER":"UNDER";
+      E.push({k:"lean",dir,cat:"juice",play:`Juice leans ${dir}`,why:`${dir} is priced at ${dir==="OVER"?d.overOdds:d.underOdds} vs. ${dir==="OVER"?d.underOdds:d.overOdds} on the other side. Books shorten the price on the side taking more money before they move the number itself — this is an earlier read than waiting for the total to actually change.`});
+    }
+  }
+  if(d.homeSpreadOdds!=null&&d.awaySpreadOdds!=null){
+    const dHome=americanToDecimal(d.homeSpreadOdds), dAway=americanToDecimal(d.awaySpreadOdds);
+    if(Math.abs(dHome-dAway)>=0.05){
+      const side=dHome<dAway?g.home.ab:g.away.ab;
+      E.push({k:"lean",dir:side,cat:"juice",play:`Juice leans ${side}`,why:`${side}'s side of the spread costs more to bet right now than the other side. That's an early signal on where the money's going, ahead of the number itself moving.`});
+    }
+  }
+  // QB QUESTIONABLE — softer than an Out/Doubtful designation, but a real
+  // uncertainty flag: the line can jump sharply close to kickoff on a starter's
+  // final status. Informational, not a pick either way.
+  inj.forEach(t=>{
+    (t.list||[]).forEach(p=>{
+      if(p.pos==="QB"&&/^questionable$/i.test(p.st||"")){
+        E.push({k:"lean",dir:null,cat:"qbquestion",play:`${t.ab} QB questionable`,why:`${p.nm} is listed Questionable${p.part?` (${p.part})`:""}. If he's downgraded closer to kickoff the line can move fast — worth checking again right before you bet instead of locking in early.`});
+      }
+    });
+  });
+  // LIVE — once the game is underway, the pregame total is CLOSED; the only number
+  // you can bet is the live line. So pace is compared to the LIVE total when the
+  // core API has one, and only shown as a reference note against the pregame
+  // total otherwise. Overtime (period>4) is skipped: sudden-death isn't pace.
+  if(g.state==="in"&&g.period!=null&&g.period>=1&&g.period<=4){
+    const hs=Number(g.home.score),as=Number(g.away.score);
+    const preTotal=g.total??d.preTotal??g.openTotal??null;
+    const preSpread=g.spread??d.preSpread??g.openSpread??null;
+    if(!Number.isNaN(hs)&&!Number.isNaN(as)){
+      const elapsedSec=(g.period-1)*900+(900-(g.clock||0));
+      const frac=Math.min(0.92,Math.max(0.12,elapsedSec/3600));
+      const mins=Math.round(frac*60);
+      const projected=(hs+as)/frac;
+      if(d.liveTotal!=null){
+        const gap=projected-d.liveTotal;
+        if(Math.abs(gap)>=5){
+          const dir=gap>0?"OVER":"UNDER";
+          E.push({k:Math.abs(gap)>=10?"strong":"lean",dir,cat:"livepace",play:`Live total: ${dir} ${d.liveTotal}`,
+            why:`${hs+as} combined through ${mins} minutes projects to about ${projected.toFixed(0)} at this pace; the live total is ${d.liveTotal}${preTotal!=null?` (pregame ${preTotal})`:""}. The live number already prices the score so far, so a ${Math.abs(gap).toFixed(0)}-point gap is a real disagreement — but pace is streaky (garbage time, clock-killing, weather), so this is in-play information, not a lock.`});
+        }
+      } else if(preTotal!=null){
+        const gap=projected-preTotal;
+        if(Math.abs(gap)>=8){
+          E.push({k:"lean",dir:null,cat:"livepace",play:`Pace running ${gap>0?"OVER":"UNDER"} the pregame ${preTotal}`,
+            why:`${hs+as} combined through ${mins} minutes projects to about ${projected.toFixed(0)} against a pregame total of ${preTotal}. That market is closed — this is context only. No live line is posted right now (books suspend at breaks and scoring plays); it will be compared against the live total when one appears.`});
+        }
+      }
+      // LIVE SPREAD — expected final margin = current margin + the pregame expectation
+      // prorated over what's left. Compared to the live spread. Heuristic, untested
+      // against outcomes, so it is never more than a lean.
+      if(d.liveSpread!=null&&preSpread!=null){
+        const remaining=1-frac;
+        const projMargin=(hs-as)+(-preSpread)*remaining;    // home-perspective
+        const liveExp=-d.liveSpread;
+        const gap=projMargin-liveExp;
+        if(Math.abs(gap)>=7){
+          const side=gap>0?g.home.ab:g.away.ab;
+          const num=gap>0?d.liveSpread:-d.liveSpread;
+          E.push({k:"lean",dir:side,cat:"livespread",play:`Live line: ${side} ${num>0?"+":""}${num}`,
+            why:`${g.home.ab} ${hs>=as?"leads":"trails"} by ${Math.abs(hs-as)} with ${Math.round(remaining*60)} minutes left. Carrying the pregame expectation (${g.home.ab} ${preSpread>0?"+":""}${preSpread}) over the rest of the game projects a final margin near ${projMargin>0?"+":""}${projMargin.toFixed(0)} for the home side; the live line (${d.liveDetails||d.liveSpread}) implies ${liveExp>0?"+":""}${liveExp.toFixed(1)}. A ${Math.abs(gap).toFixed(0)}-point gap — a simple prorate, not a model, so lean only.`});
+        }
+      }
+    }
+  }
+  // STEAM — the line has actually moved since we first saw it this week. This is
+  // real, observed money, not a modeled guess, so it's treated as a strong signal.
+  if(g.moveTotal!=null&&Math.abs(g.moveTotal)>=2){
+    const up=g.moveTotal>0;
+    E.push({k:"strong",dir:up?"OVER":"UNDER",cat:"steam",play:`Steam: total moved ${up?"up":"down"} to ${g.total}`,
+      why:`Opened at ${g.openTotal}, now ${g.total} (${up?"+":""}${g.moveTotal}). A 2+ point total move is real money or real news (weather/injury) hitting the market — it's already happening, not a prediction.`});
+  }
+  if(g.moveSpread!=null&&Math.abs(g.moveSpread)>=1.5){
+    const towardHome=g.moveSpread<0;   // spread getting more negative = home more favored
+    const side=towardHome?g.home.ab:g.away.ab;
+    E.push({k:"strong",dir:side,cat:"steam",play:`Steam: line moved to ${side}`,
+      why:`Spread opened at ${g.openSpread>0?"+":""}${g.openSpread}, now ${g.spread>0?"+":""}${g.spread}. A 1.5+ point move toward one side is the clearest real-money signal there is — sharper than any model.`});
+  }
+  return E;
+}
+
+/* ---------- signal stacking: when 2+ INDEPENDENT categories point the same
+   direction, that's a stronger claim than any one of them alone. Adds ONE
+   synthesized card at the front and reports a 0+ signalScore used for sorting. */
+function stackEdges(E,lg){
+  const buckets={};
+  E.forEach(e=>{ if(!e.dir) return; (buckets[e.dir]=buckets[e.dir]||[]).push(e); });
+  let best=0, stacked=null;
+  Object.entries(buckets).forEach(([dir,list])=>{
+    if(list.length<2) return;
+    if(list.length>best){
+      best=list.length;
+      // Weight the agreement instead of counting it. Two SOFT trends agreeing
+      // (home dog + new coach) is not the same evidence as wind + a QB ruled out,
+      // and calling both "Strong" made the label meaningless — measured on a real
+      // slate, 5 of 6 stacked cards were built purely from leans.
+      // Weight by category AND by how strongly that instance fired: 15mph gusts
+      // ("lean" wind) shouldn't count the same as 25mph gusts ("strong" wind).
+      const seen=new Set();
+      const score=list.reduce((a,e)=>{
+        if(seen.has(e.cat)) return a; seen.add(e.cat);
+        return a+effectiveWeight(e.cat,lg)*(e.k==="strong"?1:0.6);
+      },0);
+      const strong=score>=STACK_STRONG_AT;
+      stacked={k:strong?"strong":"lean",dir,cat:"stack",stacked:true,stackScore:score,
+        play:`${list.length} signals agree: ${dir}`,
+        why:`${strong?"":"These are softer indicators — agreement alone doesn't make this a strong play. "}${list.map(e=>`<b>${e.play}</b> — ${e.why}`).join("<br><br>")}`};
+    }
+  });
+  // CONFLICT: signals pointing at OPPOSITE sides of the same market. Hiding this
+  // and showing only the loudest side would fake a consensus that doesn't exist.
+  let conflict=null;
+  const totalDirs=Object.keys(buckets).filter(d=>d==="OVER"||d==="UNDER");
+  if(totalDirs.length===2){
+    conflict={k:"lean",dir:null,cat:"conflict",conflict:true,
+      play:`Signals disagree on this total`,
+      why:`Some indicators here point OVER and others point UNDER: ${
+        totalDirs.map(d=>`<b>${d}</b> (${buckets[d].map(e=>e.cat).join(", ")})`).join(" vs ")
+      }. That's a genuine split, not a hidden consensus — treat this total as unresolved rather than picking whichever side looks louder.`};
+  }
+  const sideDirs=Object.keys(buckets).filter(d=>d!=="OVER"&&d!=="UNDER");
+  if(!conflict&&sideDirs.length===2){
+    conflict={k:"lean",dir:null,cat:"conflict",conflict:true,
+      play:`Signals disagree on the side`,
+      why:`Indicators split between <b>${sideDirs[0]}</b> (${buckets[sideDirs[0]].map(e=>e.cat).join(", ")}) and <b>${sideDirs[1]}</b> (${buckets[sideDirs[1]].map(e=>e.cat).join(", ")}). Contradictory support is weaker than it looks on either side.`};
+  }
+  const score=Math.max(best,E.some(e=>e.k==="strong")?1:0) - (conflict?0.5:0);
+  const out=stacked?[stacked,...E]:E;
+  return {list:conflict?[conflict,...out]:out, score};
+}
+function edgesForScored(g){ const raw=edgesFor(g); const {list,score}=stackEdges(raw,g.lg); g.signalScore=score; return list; }
+
+/* ---------- PLAYER PROPS (directional only) ----------
+   ESPN's free feed carries NO prop lines, so this deliberately never quotes a
+   number — it points at which player props the conditions push, and names the
+   actual player from ESPN's team leaders where available. Honest by construction:
+   directional guidance, priced by whatever book you actually use. */
+function propsFor(g){
+  const d=state.detail[g.id]||{};
+  const indoor=d.indoor||g.indoor;
+  const gust=d.gust, precip=d.precip, temp=d.temp??g.temp;
+  const out=[];
+  const named=(side,cat)=>{ const l=(g.leaders?.[side]||[]).find(x=>x.cat===cat); return l?`${l.ath}${l.pos?` (${l.pos})`:""}`:null; };
+  const passers=[named("home","passingLeader"),named("away","passingLeader")].filter(Boolean);
+  const rushers=[named("home","rushingLeader"),named("away","rushingLeader")].filter(Boolean);
+  const receivers=[named("home","receivingLeader"),named("away","receivingLeader")].filter(Boolean);
+
+  if(!indoor&&gust!=null&&gust>=15){
+    const hard=gust>=20;
+    out.push({k:hard?"strong":"lean",side:"UNDER",what:"Passing yards",
+      who:passers.join(" · ")||"Both QBs",
+      why:`${gust} mph gusts. Deep throws get taken away first — this is the single most reliable weather effect on passing volume.`});
+    out.push({k:hard?"strong":"lean",side:"UNDER",what:"Kicker points",who:"Both kickers",
+      why:`Long field goals become coin flips above ${hard?20:15} mph. Teams also go for it more instead of kicking.`});
+    out.push({k:"lean",side:"OVER",what:"Rushing attempts",who:rushers.join(" · ")||"Lead backs",
+      why:`Wind pushes offenses toward the run — attempts climb even when efficiency doesn't.`});
+  }
+  if(!indoor&&precip!=null&&precip>=70){
+    out.push({k:"lean",side:"OVER",what:"Rushing attempts",who:rushers.join(" · ")||"Lead backs",
+      why:`${precip}% precipitation. Wet ball, more handoffs, more clock-burning drives.`});
+    out.push({k:"lean",side:"UNDER",what:"Receptions",who:receivers.join(" · ")||"Top targets",
+      why:`Drops go up and route trees shorten in the wet.`});
+  }
+  if(!indoor&&temp!=null&&temp<=25){
+    out.push({k:"lean",side:"UNDER",what:"Passing yards",who:passers.join(" · ")||"Both QBs",
+      why:`${temp}°F. Hard ball, cold hands, conservative playcalling.`});
+  }
+  if(indoor){
+    out.push({k:"lean",side:"OVER",what:"Passing yards",who:passers.join(" · ")||"Both QBs",
+      why:`Dome game — no wind, no precipitation, ideal throwing conditions. Passing props have their cleanest environment here.`});
+  }
+  // a QB ruled out reshapes the whole offense's prop board
+  (d.inj||[]).forEach(t=>{
+    (t.list||[]).forEach(p=>{
+      if(p.pos==="QB"&&/out|doubtful|injured reserve/i.test(p.st||"")){
+        out.push({k:"strong",side:"UNDER",what:"Team passing props",who:`${t.ab} pass-catchers`,
+          why:`${p.nm} is ${p.st}. Backup QBs throw shorter, safer, and less — it drags down every receiver on that side.`});
+      }
+    });
+  });
+  return out;
+}
+
+/* ---------- TOP PLAYS: rank the single best play across the whole slate ----------
+   Scores each gradable strong edge by how much independent support it has, so a
+   play backed by 3 agreeing signals outranks a lone one. */
+function topPlays(limit){
+  const rows=[];
+  state.games.filter(g=>g.state!=="post").forEach(g=>{
+    const raw=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
+    const byDir={};
+    raw.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
+    Object.entries(byDir).forEach(([dir,list])=>{
+      // support = distinct signal categories agreeing on this exact direction
+      const cats=[...new Set(list.map(e=>e.cat))];
+      const pr=playProb(cats,g.lg)||{p:0,src:"prior"};
+      rows.push({g,dir,cats,support:cats.length,lead:list[0],p:pr.p,src:pr.src,stake:kellyStake(pr.p,-110),
+        kick:new Date(g.date)});
+    });
+  });
+  rows.sort((a,b)=>b.p-a.p || b.support-a.support || a.kick-b.kick);
+  return limit?rows.slice(0,limit):rows;
+}
+function renderTop(){
+  const box=document.getElementById("board");
+  const rows=topPlays(12);
+  if(!rows.length){
+    box.innerHTML='<div class="note">Top Plays ranks every <b>strong</b> edge across the whole slate by how many independent signals back it. Nothing qualifies right now — that usually means conditions are mild and the lines look fair. Check back closer to kickoff, when weather firms up and injury reports land.</div>';
+    updateLive(); return;
+  }
+  box.innerHTML=`<div class="note">Ranked by <b>estimated hit probability</b> — each play's signals are scored from the best evidence available (this board's own graded record once it exists, else the 2025 backtest, else a conservative default), and the stake is <b>quarter-Kelly</b> off that number at -110. Break-even is 52.4%; anything at or under it shows no stake. Same honesty as everywhere else: these are estimates from one season of data, capped at 60%, not a promise.</div>
+    <div class="prow"><div class="pstake"><label>Bankroll $ <input type="number" id="bankrollInput" value="${state.bankroll}" min="0" step="50" style="width:100px"></label></div>
+      <div class="note" style="margin:0;flex:1;min-width:200px">Stake math is reference only — nothing is placed. Quarter-Kelly is deliberately conservative: full Kelly assumes the probability is exactly right.</div></div>
+    ${rows.map((r,i)=>`<div class="toprow">
+      <div class="topnum">${i+1}</div>
+      <div class="topbody">
+        <div class="topplay">${r.lead.play}</div>
+        <div class="topgame">${r.g.name} · ${fmtTime(r.g.date)}${r.g.total!=null?` · total ${r.g.total}`:""}${r.g.details?` · ${r.g.details}`:""}</div>
+        <div class="topcats">${r.cats.map(c=>`<span class="catchip">${c}</span>`).join("")} <span class="srcnote">${r.src==="live"?"own record":r.src==="backtest"?"2025 backtest":"default prior"}</span></div>
+      </div>
+      <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">${r.stake.dollars>0?`¼-Kelly $${r.stake.dollars}`:"no stake"}</div><div class="tsl">${r.support} signal${r.support===1?"":"s"}</div></div>
+    </div>`).join("")}`;
+  document.getElementById("bankrollInput")?.addEventListener("change",e=>{ state.bankroll=Math.max(0,Number(e.target.value)||0); lsSet("edgeboard-bankroll",state.bankroll); renderTop(); });
+  updateLive();
+}
+function renderProps(){
+  const box=document.getElementById("board");
+  const rows=state.games.filter(g=>g.state!=="post").map(g=>({g,props:propsFor(g)})).filter(x=>x.props.length);
+  rows.sort((a,b)=>(b.props.filter(p=>p.k==="strong").length)-(a.props.filter(p=>p.k==="strong").length) || new Date(a.g.date)-new Date(b.g.date));
+  box.innerHTML=`<div class="note"><b>Directional only — no prop lines here.</b> ESPN's free feed doesn't carry player prop numbers, so this never quotes one. It tells you which props the conditions push and names the players involved; you check the actual number at your book. Anything else would be making up prices.</div>
+    ${rows.length?rows.slice(0,40).map(x=>`<div class="card" style="margin-bottom:14px">
+      <div class="ctop"><div class="teams"><div class="tm">${x.g.away.ab} @ ${x.g.home.ab}</div></div>
+        <div class="when"><div class="st">${fmtTime(x.g.date)}</div></div></div>
+      <div class="edges">${x.props.map(p=>`<div class="edge ${p.k}"><span class="tag">${p.side}</span>
+        <div class="body"><div class="play">${p.what} — ${p.who}</div><div class="why">${p.why}</div></div></div>`).join("")}</div>
+    </div>`).join(""):'<div class="empty">No condition-driven prop angles right now — that mostly means calm weather and healthy starters across the slate.</div>'}`;
+  updateLive();
+}
+
+/* ---------- track record: every STRONG, gradable (dir-having) edge gets logged
+   once per game+direction, then graded automatically once that game goes final.
+   This is deliberately honest — wins AND losses both show, nothing gets hidden. ---------- */
+function recordStrongEdges(){
+  const store=lsGet("edgeboard-record-v1",[]);
+  const byId=new Map(store.map(r=>[r.id,r]));
+  const now=Date.now();
+  let changed=false;
+  state.games.forEach(g=>{
+    if(g.state==="post") return;                 // don't log a "call" after the fact
+    const live=g.state==="in", dl=state.detail[g.id]||{};
+    // a live call is a bet on the LIVE line — that's the number it must be graded against
+    const lineT=live?(dl.liveTotal??null):g.total, lineS=live?(dl.liveSpread??null):g.spread;
+    const raw=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
+    const byDir={};
+    raw.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
+    // 1) log/refresh every direction that is strong RIGHT NOW
+    Object.entries(byDir).forEach(([dir,list])=>{
+      const type=(dir==="UNDER"||dir==="OVER")?"total":"spread";
+      const id=`${g.id}|${type}|${dir}`;
+      const existing=byId.get(id);
+      if(existing){
+        // still strong on this poll — keep the call alive and keep the line current
+        existing.lastStrongTs=now; existing.lastSeenTs=now;
+        // NEVER overwrite lineTotal/lineSpread — that's the number we actually called
+        // and it's what grading must judge against. Overwriting it meant a call of
+        // "UNDER 44" that drifted to 41 got graded against 41, a number we never gave.
+        // The moving line is tracked separately for closing-line value.
+        if(!existing.live){ existing.closeTotal=g.total; existing.closeSpread=g.spread; }
+        existing.cats=[...new Set([...(existing.cats||[]),...list.map(e=>e.cat)])];
+        changed=true;
+      } else {
+        if(live&&(type==="total"?lineT==null:lineS==null)) return;   // no live line posted — nothing to call
+        const rec={id,gameId:g.id,lg:g.lg,name:g.name,type,dir,live,
+          lineTotal:lineT,lineSpread:lineS,               // the number we called (frozen)
+          closeTotal:lineT,closeSpread:lineS,             // latest seen (moves with the market)
+          homeAb:g.home.ab,awayAb:g.away.ab,
+          cats:list.map(e=>e.cat), playText:list[0].play,
+          ts:now,firstTs:now,lastStrongTs:now,lastSeenTs:now,
+          graded:false,result:null};
+        store.push(rec); byId.set(id,rec); changed=true;
+      }
+    });
+    // 2) mark every OTHER open call on this game as still-watched-but-no-longer-strong.
+    //    This is what makes "it faded before kickoff" detectable instead of silently
+    //    grading a call the board had already walked away from.
+    //    Once the game is LIVE the pregame signals are hidden by design (market closed),
+    //    so a pregame call must not be marked faded just because kickoff happened.
+    store.forEach(r=>{
+      if(r.gameId!==g.id||r.graded) return;
+      if(live&&!r.live) return;
+      // must flag `changed` too — otherwise on a poll where NOTHING is strong,
+      // neither branch above runs, the store is never written, and the fade is
+      // silently lost (caught in testing: gap stayed 0 and faded never set).
+      if(!byDir[r.dir]){ r.lastSeenTs=now; changed=true; }
+    });
+  });
+  if(changed) lsSet("edgeboard-record-v1",store);
+}
+function gradeRecords(){
+  const store=lsGet("edgeboard-record-v1",[]);
+  let changed=false;
+  store.forEach(rec=>{
+    if(rec.graded) return;
+    const g=state.games.find(x=>x.id===rec.gameId);
+    if(!g||g.state!=="post") return;
+    const hs=Number(g.home.score),as=Number(g.away.score);
+    if(Number.isNaN(hs)||Number.isNaN(as)) return;
+    if(rec.type==="total"){
+      if(rec.lineTotal==null) return;
+      const actual=hs+as;
+      rec.result = actual===rec.lineTotal ? "push" : ((rec.dir==="OVER")===(actual>rec.lineTotal) ? "win":"loss");
+    } else {
+      if(rec.lineSpread==null) return;
+      const margin=hs-as, coverMargin=margin+rec.lineSpread;   // >0 => home covers
+      if(coverMargin===0) rec.result="push";
+      else{
+        const homeCovers=coverMargin>0, dirIsHome=(rec.dir===rec.homeAb);
+        rec.result=(homeCovers===dirIsHome)?"win":"loss";
+      }
+    }
+    // Was the board still calling this STRONG the last time it looked before kickoff?
+    // If we kept watching (lastSeenTs) well past the last time it was strong
+    // (lastStrongTs), the call had faded — that's tracked separately rather than
+    // being quietly counted in the headline record either way.
+    const gapMin=(rec.lastSeenTs&&rec.lastStrongTs)?(rec.lastSeenTs-rec.lastStrongTs)/6e4:0;
+    rec.faded=gapMin>30;
+    rec.graded=true; rec.finalHome=hs; rec.finalAway=as; changed=true;
+  });
+  if(changed) lsSet("edgeboard-record-v1",store);
+}
+/* ---------- CLOSING LINE VALUE ----------
+   The metric professional bettors actually judge themselves on: did the market
+   move TOWARD your side after you called it? You can win a bet on luck; beating
+   the closing number repeatedly is much harder to fake. Works before a game even
+   finishes, which is why it's a faster read on process than W-L.
+   Returns points of CLV (positive = we got the better number), or null. */
+function clvOf(r){
+  if(r.type==="total"){
+    if(r.lineTotal==null||r.closeTotal==null) return null;
+    const move=r.closeTotal-r.lineTotal;
+    // took UNDER at a HIGHER number than it closed => good. OVER is the mirror.
+    return r.dir==="UNDER" ? -move : move;
+  }
+  if(r.lineSpread==null||r.closeSpread==null) return null;
+  const move=r.closeSpread-r.lineSpread;         // spread is home-relative
+  // Picked HOME: line getting more negative means we grabbed the cheaper number.
+  // Picked AWAY: line getting more positive means the away side got more points later.
+  return r.dir===r.homeAb ? -move : move;
+}
+function clvSummary(store){
+  const withClv=store.map(r=>({r,c:clvOf(r)})).filter(x=>x.c!=null&&Math.abs(x.c)>0.01);
+  if(!withClv.length) return null;
+  const beat=withClv.filter(x=>x.c>0).length, lost=withClv.filter(x=>x.c<0).length;
+  const avg=withClv.reduce((a,x)=>a+x.c,0)/withClv.length;
+  return {n:withClv.length,beat,lost,avg};
+}
+/* ---------- per-signal self-audit ----------
+   Which signal types are actually hitting? Uses only graded, non-faded calls and
+   refuses to report a rate under a real sample, because a 2-0 category means
+   nothing and presenting it as "100%" would be the most misleading thing here. */
+const MIN_SIGNAL_SAMPLE=5;
+function signalStats(store){
+  const by={};
+  store.filter(r=>r.graded&&!r.faded&&r.result!=="push").forEach(r=>{
+    (r.cats||[]).forEach(c=>{
+      const s=by[c]||(by[c]={cat:c,w:0,l:0,clv:[],n:0});
+      if(r.result==="win") s.w++; else s.l++;
+      s.n++;
+      const c2=clvOf(r); if(c2!=null) s.clv.push(c2);
+    });
+  });
+  return Object.values(by).map(s=>({...s,
+    pct:s.n?Math.round(100*s.w/s.n):null,
+    avgClv:s.clv.length?(s.clv.reduce((a,b)=>a+b,0)/s.clv.length):null,
+    enough:s.n>=MIN_SIGNAL_SAMPLE
+  })).sort((a,b)=>b.n-a.n);
+}
+/* Where an OPEN call stands right now, for games in progress. Provisional by
+   definition — a total "on pace" at halftime is nothing like a graded result — so it
+   is shown on the row but never counted anywhere. */
+function liveStatus(r){
+  const g=state.games.find(x=>x.id===r.gameId);
+  if(!g||g.state!=="in") return null;
+  const hs=Number(g.home.score),as=Number(g.away.score);
+  if(Number.isNaN(hs)||Number.isNaN(as)) return null;
+  const clock=g.period?`Q${g.period} ${g.short||""}`.trim():"live";
+  if(r.type==="total"){
+    if(r.lineTotal==null) return null;
+    const pts=hs+as;
+    const elapsed=g.period&&g.period<=4?((g.period-1)*900+(900-(g.clock||0))):3600;
+    const frac=Math.min(0.92,Math.max(0.12,elapsed/3600));
+    const pace=pts/frac;
+    const ok=r.dir==="OVER"?pace>r.lineTotal:pace<r.lineTotal;
+    return {ok,txt:`${pts} pts, ${clock} — on pace for ~${pace.toFixed(0)} vs ${r.dir} ${r.lineTotal}`};
+  }
+  if(r.lineSpread==null) return null;
+  const coverMargin=(hs-as)+r.lineSpread;                    // >0 => home covering
+  const dirIsHome=r.dir===r.homeAb;
+  const mine=dirIsHome?coverMargin:-coverMargin;
+  const ok=mine>0;
+  return {ok,txt:`${r.awayAb} ${as}–${hs} ${r.homeAb}, ${clock} — ${ok?"covering by":"behind the number by"} ${Math.abs(mine)}`};
+}
+function renderTrackRecord(){
+  const box=document.getElementById("board");
+  const store=lsGet("edgeboard-record-v1",[]).slice().sort((a,b)=>b.ts-a.ts);
+  const gradedAll=store.filter(r=>r.graded&&r.result!=="push");
+  const graded=gradedAll.filter(r=>!r.faded);                 // headline = calls still live at kickoff
+  const fadedGraded=gradedAll.filter(r=>r.faded);
+  const w=graded.filter(r=>r.result==="win").length, l=graded.filter(r=>r.result==="loss").length;
+  const fw=fadedGraded.filter(r=>r.result==="win").length, fl=fadedGraded.filter(r=>r.result==="loss").length;
+  const pushes=store.filter(r=>r.graded&&r.result==="push").length;
+  const pending=store.filter(r=>!r.graded).length;
+  const pct=graded.length? Math.round(100*w/graded.length) : null;
+  const rows=store.slice(0,80).map(r=>{
+    const lv=!r.graded?liveStatus(r):null;
+    const badge=!r.graded?(lv?`<span class="rbadge ${lv.ok?"win":"loss"} live">LIVE · ${lv.ok?"covering":"trailing"}</span>`:'<span class="rbadge pend">Pending</span>')
+      :r.result==="win"?'<span class="rbadge win">Win</span>'
+      :r.result==="push"?'<span class="rbadge push">Push</span>'
+      :'<span class="rbadge loss">Loss</span>';
+    const finalTxt=r.graded?` · Final ${r.awayAb} ${r.finalAway}–${r.finalHome} ${r.homeAb}`:(lv?` · ${lv.txt}`:(()=>{const g=state.games.find(x=>x.id===r.gameId);return g?` · kicks ${fmtTime(g.date)}`:"";})());
+    const fadeTxt=r.faded?' <span class="fadetag">faded before kickoff</span>':"";
+    return `<div class="trow">${badge}<div class="tbody"><div class="tplay">${r.playText}${fadeTxt}</div>
+      <div class="tsub">${r.name}${finalTxt}</div></div></div>`;
+  }).join("");
+  const clv=clvSummary(store);
+  const sig=signalStats(store);
+  const ready=sig.filter(s=>s.enough), thin=sig.filter(s=>!s.enough);
+  box.innerHTML=`
+    <div class="tkpis">
+      <div class="tk"><div class="tn">${w}-${l}${pushes?`-${pushes}`:""}</div><div class="tl">Record</div></div>
+      <div class="tk"><div class="tn">${pct==null?"—":pct+"%"}</div><div class="tl">Hit rate</div></div>
+      <div class="tk"><div class="tn">${clv?`${clv.beat}/${clv.n}`:"—"}</div><div class="tl">Beat close</div></div>
+      <div class="tk"><div class="tn">${clv?(clv.avg>0?"+":"")+clv.avg.toFixed(2):"—"}</div><div class="tl">Avg CLV (pts)</div></div>
+    </div>
+    <div class="note" style="margin-top:14px"><b>Closing line value</b> is the metric professional bettors actually grade themselves on: after a call is made, does the market move toward that side?
+    You can win a bet on luck, but repeatedly getting a better number than the closing line is hard to fake — and it reads long before the W-L sample means anything.
+    ${clv?`So far the board has beaten the close on <b>${clv.beat} of ${clv.n}</b> moved lines, averaging <b>${(clv.avg>0?"+":"")+clv.avg.toFixed(2)} points</b>. ${clv.avg>0?"Positive is the direction you want.":"Negative means the market has generally moved against these calls — worth knowing, not worth hiding."}`:`No lines have moved enough since a call was logged to measure this yet.`}</div>
+    ${sig.length?`<div class="sech" style="margin-top:22px">Signal self-audit <span class="cnt">which types actually hit</span></div>
+      ${ready.length?ready.map(s=>`<div class="sigrow">
+        <span class="catchip">${s.cat}</span>
+        <div class="sigbar"><i style="width:${s.pct}%;background:${s.pct>=55?"var(--green)":s.pct>=48?"var(--amber)":"var(--red)"}"></i></div>
+        <span class="sigpct mono">${s.pct}%</span>
+        <span class="signum">${s.w}-${s.l}${s.avgClv!=null?` · CLV ${(s.avgClv>0?"+":"")+s.avgClv.toFixed(2)}`:""}</span>
+      </div>`).join(""):""}
+      ${thin.length?`<div class="note" style="margin-top:10px">Not enough data yet to rate: ${thin.map(s=>`<span class="catchip">${s.cat} (${s.n})</span>`).join(" ")}.
+        A category needs <b>${MIN_SIGNAL_SAMPLE}+</b> graded calls before a hit rate is shown — a 2-0 signal isn't a 100% signal, and presenting it that way would be the most misleading number on this page.</div>`:""}`
+      :`<div class="note" style="margin-top:16px">Once calls start grading, this section breaks the record down <b>by signal type</b> — so if wind edges are hitting and model-gap edges aren't, that shows up here instead of hiding inside one blended number.</div>`}
+    <div class="sech" style="margin-top:22px">2025 backtest <span class="cnt">1,155 real games, closing lines</span></div>
+    <div class="note">Before this season had any results, the simple rule behind each soft signal was run against every 2025 regular-season game with its real closing line — <b>272 NFL</b> and <b>883 college</b>. These measured rates now seed the signal weights until the board has its own graded sample, and they are kept <b>per league</b> because the two disagree (the NFL leaned OVER last year; college leaned UNDER). Break-even at -110 is <b>52.4%</b>.
+    <b>Weather signals are missing on purpose</b> — ESPN strips forecast data from finished games, so wind/precip/cold cannot be backtested this way; they keep their hand-set weights.</div>
+    ${[["nfl","NFL · 272 games"],["cfb","College · 883 games"]].map(([lg,label])=>`<div class="sech" style="margin-top:14px;font-size:12px">${label}</div>
+    ${Object.entries(BACKTEST_2025[lg]).map(([k,v])=>`<div class="sigrow">
+      <span class="catchip">${k}</span>
+      <div class="sigbar"><i style="width:${v.pct}%;background:${v.pct>=54?"var(--green)":v.pct>=52.4?"var(--amber)":"var(--red)"}"></i></div>
+      <span class="sigpct mono">${v.pct}%</span>
+      <span class="signum">n=${v.n} · ${v.note}</span>
+    </div>`).join("")}`).join("")}
+    <div class="note" style="margin-top:14px"><b>How this is tracked, honestly.</b> Every <b>strong</b> edge gets logged the moment it appears and graded once the game goes final — wins and losses both, nothing hidden.
+    <br><br><b>What if a call stops being strong during the week?</b> That happens constantly: a wind forecast softens, a questionable QB gets cleared. Every time the board reloads it re-checks each open call. If a call was still strong the last time the board looked before kickoff, it counts in the record above. If the board watched it stop being strong, it's marked <span class="fadetag">faded before kickoff</span> and kept in a separate line — because grading a play the board had already walked away from would flatter the record either direction.
+    ${fadedGraded.length?`<br><br><b>Faded calls:</b> ${fw}-${fl} — flagged early, no longer strong by kickoff. Shown for completeness, not counted above.`:""}
+    <br><br>One real limitation: this only re-checks while the page is actually open, and it's stored in this browser only. Leave it closed all week and a call can't be re-verified — those still count, but the board never saw them fade. Softer "lean" calls aren't graded at all, since they aren't a specific bet against a number.</div>
+    ${rows||'<div class="empty">No calls logged yet this week — check back once games are closer to kickoff.</div>'}`;
+  updateLive();
+}
+
+/* ---------- parlay builder: combine this week's currently-open strong edges
+   using REAL prices from ESPN's pickcenter where available, -110 as the
+   standard fallback. Pure client-side math, no fake "guaranteed" framing. */
+function americanToDecimal(a){ return a>0? 1+a/100 : 1+100/Math.abs(a); }
+function decimalToAmerican(d){ return d>=2? Math.round((d-1)*100) : Math.round(-100/(d-1)); }
+function parlayLegs(){
+  const legs=[]; const seen=new Set();
+  state.games.filter(g=>g.state!=="post").forEach(g=>{
+    const d=state.detail[g.id]||{};
+    edgesForScored(g).filter(e=>e.k==="strong"&&e.dir&&!e.stacked).forEach(e=>{
+      const type=(e.dir==="UNDER"||e.dir==="OVER")?"total":"spread";
+      const id=`${g.id}|${type}|${e.dir}`;
+      if(seen.has(id)) return; seen.add(id);
+      const odds = type==="total" ? (e.dir==="OVER"?(d.overOdds??-110):(d.underOdds??-110)) : (d.spreadOdds??-110);
+      legs.push({id,gameId:g.id,name:g.name,play:e.play,odds:Math.round(odds)});
+    });
+  });
+  return legs;
+}
+function renderParlay(){
+  const box=document.getElementById("board");
+  const legs=parlayLegs();
+  const picked=legs.filter(l=>state.parlayPicks.has(l.id));
+  const byGame={}; picked.forEach(l=>{ (byGame[l.gameId]=byGame[l.gameId]||[]).push(l); });
+  const correlated=Object.values(byGame).some(arr=>arr.length>1);
+  let payoutHtml="";
+  if(picked.length){
+    const dec=picked.reduce((a,l)=>a*americanToDecimal(l.odds),1);
+    const stake=state.stake||0;
+    const payout=stake*dec, profit=payout-stake;
+    const amer=decimalToAmerican(dec);
+    payoutHtml=`<div class="pcalc">
+      <div class="pk"><div class="pn">${amer>0?"+":""}${amer}</div><div class="pl">Parlay odds</div></div>
+      <div class="pk"><div class="pn">$${profit.toFixed(2)}</div><div class="pl">Profit on $${stake}</div></div>
+      <div class="pk"><div class="pn">$${payout.toFixed(2)}</div><div class="pl">Total payout</div></div>
+    </div>${correlated?'<div class="note" style="border-left-color:var(--red)"><b>Heads up:</b> two or more legs share the same game. Same-game outcomes aren\'t independent, so the real odds of hitting both are worse than this math shows.</div>':""}`;
+  }
+  const rows=legs.map(l=>`<label class="pleg"><input type="checkbox" data-leg="${l.id}" ${state.parlayPicks.has(l.id)?"checked":""}>
+    <div class="plegbody"><div class="pt">${l.play}</div><div class="ps">${l.name}</div></div>
+    <div class="po mono">${l.odds>0?"+":""}${l.odds}</div></label>`).join("");
+  box.innerHTML=`
+    <div class="note">Built from this week's currently <b>strong</b> edges only, priced with real sportsbook juice where ESPN provides it (else standard -110).
+    Check the legs you want, stake is for reference math — this doesn't place anything. Parlays are high variance by design; treat it as entertainment, not a plan.</div>
+    <div class="prow">
+      <div class="pstake"><label>Stake $ <input type="number" id="stakeInput" value="${state.stake}" min="1" style="width:80px"></label></div>
+      ${payoutHtml}
+    </div>
+    ${legs.length?`<div class="plegs">${rows}</div>`:'<div class="empty">No strong edges open right now — check back closer to kickoff.</div>'}`;
+  document.getElementById("stakeInput")?.addEventListener("input",e=>{ state.stake=Math.max(0,Number(e.target.value)||0); renderParlay(); });
+  updateLive();
+}
+
+/* ---------- render ---------- */
+const fmtTime=iso=>{const d=new Date(iso);return d.toLocaleString(undefined,{weekday:"short",hour:"numeric",minute:"2-digit"});};
+function condPills(g){
+  const d=state.detail[g.id]||{};
+  const indoor=d.indoor||g.indoor;
+  const out=[];
+  if(indoor) out.push('<span class="pill dome">🏟 Dome · weather neutral</span>');
+  else{
+    if(d.gust!=null) out.push(`<span class="pill wind">💨 ${d.gust} mph gusts</span>`);
+    if((d.precip??null)!=null&&d.precip>=40) out.push(`<span class="pill rain">🌧 ${d.precip}%</span>`);
+    const t=d.temp??g.temp;
+    if(t!=null) out.push(`<span class="pill${t<=25?" cold":""}">🌡 ${t}°F</span>`);
+    if(g.cond) out.push(`<span class="pill">${g.cond}</span>`);
+    if(!d.got) out.push('<span class="pill"><span class="spin" style="width:9px;height:9px"></span> conditions…</span>');
+  }
+  if(g.state==="in"&&(d.liveTotal!=null||d.liveSpread!=null)) out.unshift(`<span class="pill live">📡 LIVE line ${d.liveDetails||(d.liveSpread!=null?(d.liveSpread>0?"+":"")+d.liveSpread:"")}${d.liveTotal!=null?` · O/U ${d.liveTotal}`:""}</span>`);
+  else if(g.state==="in"&&d.got) out.unshift('<span class="pill">📡 live line suspended</span>');
+  const qbOut=(d.inj||[]).some(t=>(t.list||[]).some(p=>p.pos==="QB"&&/out|doubtful|injured reserve/i.test(p.st||"")));
+  if(qbOut) out.push('<span class="pill inj">🚑 QB out</span>');
+  return out.join("");
+}
+/* Day bucket label for chronological grouping — "TONIGHT" for anything still to
+   kick off today, so the next game to lock in is unmistakable at the top. */
+function dayLabel(iso,gstate){
+  if(gstate==="in") return "🔴 LIVE NOW";
+  const d=new Date(iso), now=new Date();
+  const startOfDay=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const days=Math.round((startOfDay(d)-startOfDay(now))/864e5);
+  const t=d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+  if(days<0) return "Earlier this week";
+  if(days===0) return d.getHours()>=17?`Tonight · first kick ${t}`:`Today · first kick ${t}`;
+  if(days===1) return "Tomorrow";
+  return d.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
+}
+/* "0-0" is what ESPN reports before anyone has played — showing it just adds
+   noise to every card in week 1, so suppress it until there's a real record. */
+function recTag(rec){ return (!rec||rec==="0-0")?"":`<span class="rec">${rec}</span>`; }
+/* ESPN uses 99 for "unranked"; only 1-25 is a real poll ranking. */
+function rankTag(r){ return (typeof r==="number"&&r>=1&&r<=25)?`<span class="rnk">#${r}</span>`:""; }
+/* Our projected line vs the book, with the disagreement called out. Also fills
+   the gap when the book has NOT posted a number — the model still has an opinion. */
+function projBlock(g){
+  const p=projectLine(g);
+  if(p.spread==null&&p.total==null) return "";
+  const noMarket=(g.spread==null&&g.total==null);
+  const edgeChip=(v,label)=>{
+    if(v==null) return "";
+    const big=Math.abs(v)>=2, mid=Math.abs(v)>=1;
+    if(!mid) return `<span class="pedge flat">${label} matches book</span>`;
+    return `<span class="pedge ${big?"big":""}">${label} ${v>0?"+":""}${v} vs book</span>`;
+  };
+  return `<div class="proj">
+    <div class="projhead">
+      <span class="pl">Our projected line</span>
+      <span class="pconf ${p.confidence}">${p.confidence} confidence</span>
+    </div>
+    <div class="projrow">
+      <div class="pcell"><div class="pk">Spread</div>
+        <div class="pv">${fmtLine(p.spread,g.home.ab,g.away.ab)}</div>
+        <div class="pm">${g.details?`book: ${g.details}`:`<span class="nomkt">book: not posted</span>`}</div></div>
+      <div class="pcell"><div class="pk">Total</div>
+        <div class="pv">${p.total??"—"}</div>
+        <div class="pm">${g.total!=null?`book: ${g.total}`:`<span class="nomkt">book: not posted</span>`}</div></div>
+    </div>
+    ${(p.spreadEdge!=null||p.totalEdge!=null)?`<div class="pedges">${edgeChip(p.spreadEdge,"spread")}${edgeChip(p.totalEdge,"total")}</div>`:""}
+    ${noMarket?`<div class="pnote">DraftKings hasn't posted this game yet — everything above is the model's own number, so there's nothing to bet against it until a line appears.</div>`:""}
+    ${p.blowout?`<div class="pnote">Blowout-sized spread — the model is measurably unreliable at this size (still ~9-18 pts off), so <b>no spread edge is claimed</b>. The total is modelled separately and is unaffected by that.</div>`:""}
+    <details class="pwhy"><summary>How this number was built</summary>
+      <div><b>Spread:</b> ${p.spreadBasis||"no model input available"}.<br><b>Total:</b> ${p.totalBasis}.
+      ${p.notes.length?`<br><b>Adjustments:</b> ${p.notes.join(" · ")}.`:""}
+      <br><br>These adjustments are industry-standard rules of thumb (a QB out is worth about a touchdown, wind suppresses scoring), <b>not</b> coefficients fitted to historical results.
+      <br><br><b>How accurate is this?</b> Checked against live DraftKings numbers on a real slate, the projected spread lands within 3 points on ~58% of games and within 7 on ~92%, averaging about 4.5 points off. That's useful as a second opinion — it is <b>not</b> sharper than the book, and on blowout-sized lines it's worse, which is why no edge is claimed there.
+      <br><br><b>Against real results, not just the book:</b> our ratings were replayed through all of 2025 with no lookahead. Betting our side at a 3+ point disagreement went <b>57% in the NFL from week 10 on</b> and <b>55% in college from week 6 on</b> — and <b>lost</b> before that, and lost at 6+ point disagreements in both leagues. So the ratings edge only appears once both teams have enough games, and never when we're 6+ points off the market.</div>
+    </details>
+  </div>`;
+}
+function moveTag(v,unit){ if(v==null||Math.abs(v)<0.5) return ""; const up=v>0;
+  return ` <span class="mono" style="color:var(--${up?"green":"red"});font-size:10.5px">${up?"▲":"▼"}${Math.abs(v)}${unit||""}</span>`; }
+function card(g){
+  const E=edgesForScored(g);
+  const strong=E.some(e=>e.k==="strong");
+  const live=g.state==="in";
+  const ml=(v)=>v==null?"—":(typeof v==="number"?(v>0?"+"+v:v):v);
+  return `<div class="card${strong?" hot":""}">
+    <div class="ctop">
+      <div class="teams">
+        <div class="tm${g.favAb===g.away.ab?" fav":""}">${g.away.logo?`<img src="${g.away.logo}" alt="">`:""}${rankTag(g.away.rank)}<span>${g.away.ab}</span>${recTag(g.away.rec)}${live?`<span class="mono">${g.away.score??""}</span>`:""}</div>
+        <div class="tm${g.favAb===g.home.ab?" fav":""}">${g.home.logo?`<img src="${g.home.logo}" alt="">`:""}${rankTag(g.home.rank)}<span>${g.home.ab}</span>${recTag(g.home.rec)}${live?`<span class="mono">${g.home.score??""}</span>`:""}</div>
+      </div>
+      <div class="when"><div class="st${live?" livegame":""}">${live?"● LIVE":(g.state==="post"?"FINAL":fmtTime(g.date))}</div>
+        <div>${live||g.state==="post"?g.short:(g.nextWeek?"next week":(g.venue||"").slice(0,26))}</div></div>
+    </div>
+    <div class="lines">
+      <div class="ln"><div class="l">Spread</div><div class="v">${g.details||"—"}${moveTag(g.moveSpread,"")}</div></div>
+      <div class="ln"><div class="l">Total</div><div class="v">${g.total??"—"}${moveTag(g.moveTotal,"")}</div></div>
+      <div class="ln"><div class="l">ML ${g.away.ab}/${g.home.ab}</div><div class="v" style="font-size:11.5px">${ml(g.mlAway)} / ${ml(g.mlHome)}</div></div>
+    </div>
+    ${projBlock(g)}
+    ${strong?bestChip(bestPlay(g)):""}
+    <div class="cond">${condPills(g)}</div>
+    ${E.length?`<div class="edges">${E.slice(0,4).map(e=>`
+      <div class="edge ${e.k}${e.stacked?" stacked":""}${e.conflict?" conflict":""}">${e.stacked?"🧱 ":""}${e.conflict?"⚠️ ":""}<span class="tag">${e.k==="strong"?"Strong":"Lean"}</span>
+        <div class="body"><div class="play">${e.play}</div><div class="why">${e.why}</div></div></div>`).join("")}</div>`
+      :`<div class="nodata">${(state.detail[g.id]||{}).got?"No strong edge — line looks fair for the conditions.":"Checking conditions…"}</div>`}
+  </div>`;
+}
+function render(){
+  if(state.view==="track"){ renderTrackRecord(); return; }
+  if(state.view==="parlay"){ renderParlay(); return; }
+  if(state.view==="top"){ renderTop(); return; }
+  if(state.view==="props"){ renderProps(); return; }
+  const box=document.getElementById("board");
+  let gs=state.games.slice();
+  if(state.league!=="all") gs=gs.filter(g=>g.lg===state.league);
+  if(state.outdoorOnly) gs=gs.filter(g=>!( (state.detail[g.id]||{}).indoor||g.indoor ));
+  if(state.edgesOnly) gs=gs.filter(g=>edgesForScored(g).length>0);
+  else gs.forEach(g=>edgesForScored(g));   // still compute signalScore for sort
+  gs.sort((a,b)=>(b.signalScore||0)-(a.signalScore||0) || new Date(a.date)-new Date(b.date));
+  if(!gs.length){
+    box.innerHTML=`<div class="empty">${state.games.length?"No games match — try turning off <b>Edges only</b>.":"<span class='spin'></span> Loading…"}</div>`;
+    updateLive(); return;
+  }
+  const sec=(t,list)=>list.length?`<div class="sech">${t} <span class="cnt">${list.length}</span></div><div class="lgrid">${list.map(card).join("")}</div>`:"";
+  if(state.sort==="best"){
+    // Best bets of the week: only games with a STRONG directional play, ranked by
+    // that play's estimated hit probability. Games under BEST_MIN_PROB are listed
+    // separately so a 52% "strong" never sits next to a 57% one as an equal.
+    const rated=gs.map(g=>({g,b:bestPlay(g)})).filter(x=>x.b&&x.g.state!=="post").sort((a,b)=>b.b.p-a.b.p);
+    const top=rated.filter(x=>x.b.p>=BEST_MIN_PROB).map(x=>x.g), rest=rated.filter(x=>x.b.p<BEST_MIN_PROB).map(x=>x.g);
+    box.innerHTML=rated.length?sec("🏆 Best bets of the week",top)+sec("Strong, but thin margin over break-even",rest)
+      :'<div class="empty">No strong directional play qualifies yet — check back as weather firms up and injury reports land.</div>';
+    updateLive(); return;
+  }
+  if(state.sort==="time"){
+    // Chronological: whatever kicks off next sits at the top, grouped by day so
+    // "tonight" is unmistakable. Live games always jump to the very front.
+    gs.sort((a,b)=>{
+      const la=a.state==="in"?0:1, lb=b.state==="in"?0:1;
+      return la-lb || new Date(a.date)-new Date(b.date);
+    });
+    const buckets=new Map();
+    gs.forEach(g=>{ const k=dayLabel(g.date,g.state); if(!buckets.has(k)) buckets.set(k,[]); buckets.get(k).push(g); });
+    box.innerHTML=[...buckets].map(([label,list])=>sec(label,list)).join("");
+  } else {
+    const nfl=gs.filter(g=>g.lg==="nfl"), cfb=gs.filter(g=>g.lg==="cfb");
+    box.innerHTML=sec("NFL",nfl)+sec("College Football",cfb);
+  }
+  updateLive();
+}
+function updateLive(){
+  const n=state.games.length, e=state.games.filter(g=>edgesForScored(g).length).length;
+  const s=state.games.filter(g=>edgesForScored(g).some(x=>x.k==="strong")).length;
+  document.getElementById("liveTxt").textContent=`${n} games · ${e} with edges · ${s} strong`;
+}
+
+/* ---------- controls + refresh ---------- */
+document.getElementById("viewSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  state.view=b.dataset.view;[...e.currentTarget.children].forEach(x=>x.dataset.on=(x===b)?"1":"0");
+  const boardOnly=state.view==="board";
+  document.getElementById("leagueSeg").style.display=boardOnly?"":"none";
+  document.getElementById("edgesOnly").closest("label").style.display=boardOnly?"":"none";
+  document.getElementById("outdoorOnly").closest("label").style.display=boardOnly?"":"none";
+  render();});
+document.getElementById("board").addEventListener("change",e=>{
+  const cb=e.target.closest("[data-leg]"); if(!cb) return;
+  if(cb.checked) state.parlayPicks.add(cb.dataset.leg); else state.parlayPicks.delete(cb.dataset.leg);
+  renderParlay();
+});
+document.getElementById("sortSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  state.sort=b.dataset.sort;[...e.currentTarget.children].forEach(x=>x.dataset.on=(x===b)?"1":"0");render();});
+document.getElementById("leagueSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  state.league=b.dataset.lg;[...e.currentTarget.children].forEach(x=>x.dataset.on=(x===b)?"1":"0");render();});
+document.getElementById("edgesOnly").addEventListener("change",e=>{state.edgesOnly=e.target.checked;render();});
+document.getElementById("outdoorOnly").addEventListener("change",e=>{state.outdoorOnly=e.target.checked;render();});
+document.getElementById("refreshBtn").addEventListener("click",()=>{loadSlate();});
+function applyTheme(){const r=document.documentElement;if(state.theme)r.setAttribute("data-theme",state.theme);else r.removeAttribute("data-theme");}
+document.getElementById("themeBtn").addEventListener("click",()=>{
+  const cur=state.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+  state.theme=cur==="dark"?"light":"dark";applyTheme();try{localStorage.setItem("edgeboard-theme",state.theme);}catch(e){}});
+try{const t=localStorage.getItem("edgeboard-theme");if(t)state.theme=t;}catch(e){}
+applyTheme();
+
+/* Install as an app on the home screen. Registered after load so it never
+   delays first paint, and failures are non-fatal — the site works without it. */
+if("serviceWorker" in navigator){
+  addEventListener("load",()=>{ navigator.serviceWorker.register("/sw.js").catch(()=>{}); });
+}
+/* Pause polling while the app is backgrounded (saves phone battery), and pull
+   fresh data the moment it comes back — important when you flip back mid-game. */
+let pollA=null,pollB=null;
+function startPolling(){
+  stopPolling();
+  pollA=setInterval(loadSlate,60000);      // odds + scores every minute
+  pollB=setInterval(queueDetails,300000);  // weather + injuries every 5 min
+}
+function stopPolling(){ clearInterval(pollA); clearInterval(pollB); }
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden) stopPolling();
+  else { loadSlate(); startPolling(); }
+});
+
+loadSlate();
+startPolling();
+})();
+</script>
+</body>
+</html>
