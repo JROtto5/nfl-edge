@@ -4,7 +4,7 @@
    every viewer in the same ~20s window shares one upstream hit. Live data is never
    held longer than that — a stale line is worse than a slow one. */
 const ALLOW=/^https:\/\/(site\.api\.espn\.com|sports\.core\.api\.espn\.com)\//;
-const TTL_MS=20000;
+const TTL_MS=10000;   // scores must feel live; 10s is the most we hold anything
 const MAX_ENTRIES=600;
 const cache=new Map();            // url -> {t, body}
 

@@ -153,6 +153,23 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .srcnote{font-size:10px;color:var(--dim);margin-left:4px}
 .bestchip{font-size:12px;color:var(--dim);padding:7px 10px;border:1px dashed var(--line);border-radius:9px;margin:8px 0 2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .pill.live{border-color:var(--amber);color:var(--ink)}
+.callbox{border-radius:11px;padding:11px 13px;display:flex;flex-direction:column;gap:4px;border:2px solid var(--line);background:var(--bg2)}
+.callbox.bet{border-color:var(--green)}
+.callbox.live{border-color:var(--amber)}
+.callbox .cb1{font-size:18px;font-weight:800;letter-spacing:.01em;line-height:1.2}
+.callbox .cb2{font-size:13px;color:var(--dim)}
+.callbox .cb3{font-weight:400;color:var(--dim)}
+.callbox.nobet{border-style:dashed}
+.callbox.nobet .cb1{font-size:14px;color:var(--dim)}
+.whyd summary{font-size:11px;color:var(--dim);cursor:pointer;margin-top:3px;list-style:none;user-select:none}
+.whyd summary::-webkit-details-marker{display:none}
+.whyd summary::before{content:"▸ "}
+.whyd[open] summary::before{content:"▾ "}
+.sc{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:22px;font-weight:800;margin-left:auto;padding-left:10px}
+.clk{font-size:14px;font-weight:700;color:var(--ink)}
+.adv{margin-top:18px;border:1px solid var(--line);border-radius:11px;padding:10px 14px;background:var(--panel)}
+.adv summary{cursor:pointer;font-weight:700;font-size:13.5px;color:var(--dim)}
+.adv[open] summary{margin-bottom:8px}
 .rbadge.live{animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .bestchip.good{border-color:var(--green);color:var(--ink)}
@@ -264,7 +281,7 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
       <button data-view="board" data-on="1">Board</button>
       <button data-view="top">★ Top Plays</button>
       <button data-view="props">Props</button>
-      <button data-view="track">Track Record</button>
+      <button data-view="track">Results</button>
       <button data-view="parlay">Parlay Builder</button>
     </div>
     <div class="seg" id="leagueSeg">
@@ -508,6 +525,8 @@ async function loadSlate(){
   // in-progress games carry the live line — re-pull their details on every poll
   const liveNow=out.filter(g=>g.state==="in");
   if(liveNow.length){ liveNow.forEach(g=>{ if(!detailQueue.some(x=>x.id===g.id)) detailQueue.push(g); }); if(!detailRunning) runQueue(); }
+  // switch poll speed when games start or finish
+  if((liveNow.length>0)!==pollFast&&typeof document!=="undefined"&&!document.hidden&&pollA) startPolling();
   render();
   queueDetails();
   recordStrongEdges();
@@ -803,6 +822,32 @@ function bestPlay(g){
     if(!best||pr.p>best.p) best={dir,cats,p:pr.p,src:pr.src,lead:list[0],stake:kellyStake(pr.p,-110)};
   });
   return best;
+}
+// Format the number a call is on: totals carry the total, sides carry THEIR spread.
+function callNumber(g,dir,live){
+  const d=state.detail[g.id]||{};
+  if(dir==="OVER"||dir==="UNDER"){ const t=live?d.liveTotal:g.total; return t!=null?`${dir} ${t}`:dir; }
+  const sp=live?d.liveSpread:g.spread;                   // home-relative
+  if(sp==null) return dir;
+  const mine=dir===g.home.ab?sp:-sp;
+  return `${dir} ${mine>0?"+":""}${mine}`;
+}
+/* THE CALL — the one thing a card has to say plainly: bet this, this much, or don't. */
+function callBox(g){
+  const live=g.state==="in";
+  const b=bestPlay(g);
+  if(b){
+    const num=callNumber(g,b.dir,live);
+    const stake=b.stake.dollars>0?`$${b.stake.dollars} <span class="cb3">(${b.stake.pct}% of $${state.bankroll}, ¼-Kelly)</span>`:`no stake <span class="cb3">(est. under break-even)</span>`;
+    return `<div class="callbox bet${live?" live":""}">
+      <div class="cb1">▶ ${live?"LIVE BET":"BET"}: ${num}</div>
+      <div class="cb2"><b>${stake}</b> · <b>${b.p}%</b> est. hit rate</div>
+      <div class="cb2">Because: ${b.lead.play}${b.cats.length>1?` + ${b.cats.length-1} more signal${b.cats.length>2?"s":""} agreeing`:""}</div>
+    </div>`;
+  }
+  const E=edgesFor(g);
+  if(E.some(e=>e.dir)) return `<div class="callbox nobet"><div class="cb1">◦ NO BET — leans only</div><div class="cb2">Something's leaning but nothing here is strong enough to stake. Watch it; don't bet it.</div></div>`;
+  return "";
 }
 function bestChip(b){
   if(!b) return "";
@@ -1374,14 +1419,14 @@ function renderTop(){
     box.innerHTML='<div class="note">Top Plays ranks every <b>strong</b> edge across the whole slate by how many independent signals back it. Nothing qualifies right now — that usually means conditions are mild and the lines look fair. Check back closer to kickoff, when weather firms up and injury reports land.</div>';
     updateLive(); return;
   }
-  box.innerHTML=`<div class="note">Ranked by <b>estimated hit probability</b> — each play's signals are scored from the best evidence available (this board's own graded record once it exists, else the 2025 backtest, else a conservative default), and the stake is <b>quarter-Kelly</b> off that number at -110. Break-even is 52.4%; anything at or under it shows no stake. Same honesty as everywhere else: these are estimates from one season of data, capped at 60%, not a promise.</div>
+  box.innerHTML=`<div class="note"><b>What gets on this list:</b> a play has to be <b>STRONG</b>. That means either one piece of hard evidence — a QB ruled out, 25+ mph gusts on a total, real line movement, a live pace gap — or several weighted signals agreeing to a score of 4+. Leans never qualify, no matter how many. Then the list is ranked by <b>estimated hit rate</b> (this board's own record once it has one, else the 2025 backtest, else a conservative default) and the stake is <b>quarter-Kelly</b> on your bankroll at -110. Break-even is 52.4%; at or under it, no stake. Estimates, capped at 60% — not promises.</div>
     <div class="prow"><div class="pstake"><label>Bankroll $ <input type="number" id="bankrollInput" value="${state.bankroll}" min="0" step="50" style="width:100px"></label></div>
       <div class="note" style="margin:0;flex:1;min-width:200px">Stake math is reference only — nothing is placed. Quarter-Kelly is deliberately conservative: full Kelly assumes the probability is exactly right.</div></div>
     ${rows.map((r,i)=>`<div class="toprow">
       <div class="topnum">${i+1}</div>
       <div class="topbody">
-        <div class="topplay">${r.lead.play}</div>
-        <div class="topgame">${r.g.name} · ${fmtTime(r.g.date)}${r.g.total!=null?` · total ${r.g.total}`:""}${r.g.details?` · ${r.g.details}`:""}</div>
+        <div class="topplay">▶ ${r.g.state==="in"?"LIVE BET":"BET"}: ${callNumber(r.g,r.dir,r.g.state==="in")}</div>
+        <div class="topgame">${r.g.name} · ${r.g.state==="in"?`LIVE ${r.g.away.score}–${r.g.home.score} ${r.g.short}`:fmtTime(r.g.date)} · because: ${r.lead.play}</div>
         <div class="topcats">${r.cats.map(c=>`<span class="catchip">${c}</span>`).join("")} <span class="srcnote">${r.src==="live"?"own record":r.src==="backtest"?"2025 backtest":"default prior"}</span></div>
       </div>
       <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">${r.stake.dollars>0?`¼-Kelly $${r.stake.dollars}`:"no stake"}</div><div class="tsl">${r.support} signal${r.support===1?"":"s"}</div></div>
@@ -1598,6 +1643,10 @@ function renderTrackRecord(){
       <div class="tk"><div class="tn">${clv?`${clv.beat}/${clv.n}`:"—"}</div><div class="tl">Beat close</div></div>
       <div class="tk"><div class="tn">${clv?(clv.avg>0?"+":"")+clv.avg.toFixed(2):"—"}</div><div class="tl">Avg CLV (pts)</div></div>
     </div>
+    <div class="note"><b>What this is:</b> every <b>STRONG</b> call this board has made — the same plays that appear in ★ Top Plays — logged the moment it appeared with the line frozen, and graded when the game went final. Leans are never logged. It lives on this device, so it only contains what this phone has watched.</div>
+    <div class="sech" style="margin-top:16px">Calls <span class="cnt">${pending} open · ${graded.length} graded</span></div>
+    ${rows||'<div class="empty">No calls logged yet this week — check back once games are closer to kickoff.</div>'}
+    <details class="adv"><summary>Advanced: closing line value · signal audit · 2025 backtests</summary>
     <div class="note" style="margin-top:14px"><b>Closing line value</b> is the metric professional bettors actually grade themselves on: after a call is made, does the market move toward that side?
     You can win a bet on luck, but repeatedly getting a better number than the closing line is hard to fake — and it reads long before the W-L sample means anything.
     ${clv?`So far the board has beaten the close on <b>${clv.beat} of ${clv.n}</b> moved lines, averaging <b>${(clv.avg>0?"+":"")+clv.avg.toFixed(2)} points</b>. ${clv.avg>0?"Positive is the direction you want.":"Negative means the market has generally moved against these calls — worth knowing, not worth hiding."}`:`No lines have moved enough since a call was logged to measure this yet.`}</div>
@@ -1621,11 +1670,12 @@ function renderTrackRecord(){
       <span class="sigpct mono">${v.pct}%</span>
       <span class="signum">n=${v.n} · ${v.note}</span>
     </div>`).join("")}`).join("")}
+    </details>
     <div class="note" style="margin-top:14px"><b>How this is tracked, honestly.</b> Every <b>strong</b> edge gets logged the moment it appears and graded once the game goes final — wins and losses both, nothing hidden.
     <br><br><b>What if a call stops being strong during the week?</b> That happens constantly: a wind forecast softens, a questionable QB gets cleared. Every time the board reloads it re-checks each open call. If a call was still strong the last time the board looked before kickoff, it counts in the record above. If the board watched it stop being strong, it's marked <span class="fadetag">faded before kickoff</span> and kept in a separate line — because grading a play the board had already walked away from would flatter the record either direction.
     ${fadedGraded.length?`<br><br><b>Faded calls:</b> ${fw}-${fl} — flagged early, no longer strong by kickoff. Shown for completeness, not counted above.`:""}
     <br><br>One real limitation: this only re-checks while the page is actually open, and it's stored in this browser only. Leave it closed all week and a call can't be re-verified — those still count, but the board never saw them fade. Softer "lean" calls aren't graded at all, since they aren't a specific bet against a number.</div>
-    ${rows||'<div class="empty">No calls logged yet this week — check back once games are closer to kickoff.</div>'}`;
+    `;
   updateLive();
 }
 
@@ -1767,23 +1817,23 @@ function card(g){
   return `<div class="card${strong?" hot":""}">
     <div class="ctop">
       <div class="teams">
-        <div class="tm${g.favAb===g.away.ab?" fav":""}">${g.away.logo?`<img src="${g.away.logo}" alt="">`:""}${rankTag(g.away.rank)}<span>${g.away.ab}</span>${recTag(g.away.rec)}${live?`<span class="mono">${g.away.score??""}</span>`:""}</div>
-        <div class="tm${g.favAb===g.home.ab?" fav":""}">${g.home.logo?`<img src="${g.home.logo}" alt="">`:""}${rankTag(g.home.rank)}<span>${g.home.ab}</span>${recTag(g.home.rec)}${live?`<span class="mono">${g.home.score??""}</span>`:""}</div>
+        <div class="tm${g.favAb===g.away.ab?" fav":""}">${g.away.logo?`<img src="${g.away.logo}" alt="">`:""}${rankTag(g.away.rank)}<span>${g.away.ab}</span>${recTag(g.away.rec)}${live||g.state==="post"?`<span class="sc">${g.away.score??""}</span>`:""}</div>
+        <div class="tm${g.favAb===g.home.ab?" fav":""}">${g.home.logo?`<img src="${g.home.logo}" alt="">`:""}${rankTag(g.home.rank)}<span>${g.home.ab}</span>${recTag(g.home.rec)}${live||g.state==="post"?`<span class="sc">${g.home.score??""}</span>`:""}</div>
       </div>
       <div class="when"><div class="st${live?" livegame":""}">${live?"● LIVE":(g.state==="post"?"FINAL":fmtTime(g.date))}</div>
-        <div>${live||g.state==="post"?g.short:(g.nextWeek?"next week":(g.venue||"").slice(0,26))}</div></div>
+        <div class="${live?"clk":""}">${live||g.state==="post"?g.short:(g.nextWeek?"next week":(g.venue||"").slice(0,26))}</div></div>
     </div>
     <div class="lines">
       <div class="ln"><div class="l">Spread</div><div class="v">${g.details||"—"}${moveTag(g.moveSpread,"")}</div></div>
       <div class="ln"><div class="l">Total</div><div class="v">${g.total??"—"}${moveTag(g.moveTotal,"")}</div></div>
       <div class="ln"><div class="l">ML ${g.away.ab}/${g.home.ab}</div><div class="v" style="font-size:11.5px">${ml(g.mlAway)} / ${ml(g.mlHome)}</div></div>
     </div>
+    ${callBox(g)}
     ${projBlock(g)}
-    ${strong?bestChip(bestPlay(g)):""}
     <div class="cond">${condPills(g)}</div>
     ${E.length?`<div class="edges">${E.slice(0,4).map(e=>`
       <div class="edge ${e.k}${e.stacked?" stacked":""}${e.conflict?" conflict":""}">${e.stacked?"🧱 ":""}${e.conflict?"⚠️ ":""}<span class="tag">${e.k==="strong"?"Strong":"Lean"}</span>
-        <div class="body"><div class="play">${e.play}</div><div class="why">${e.why}</div></div></div>`).join("")}</div>`
+        <div class="body"><div class="play">${e.play}</div><details class="whyd"><summary>why</summary><div class="why">${e.why}</div></details></div></div>`).join("")}</div>`
       :`<div class="nodata">${(state.detail[g.id]||{}).got?"No strong edge — line looks fair for the conditions.":"Checking conditions…"}</div>`}
   </div>`;
 }
@@ -1833,7 +1883,9 @@ function render(){
 function updateLive(){
   const n=state.games.length, e=state.games.filter(g=>edgesForScored(g).length).length;
   const s=state.games.filter(g=>edgesForScored(g).some(x=>x.k==="strong")).length;
-  document.getElementById("liveTxt").textContent=`${n} games · ${e} with edges · ${s} strong`;
+  const lv=state.games.filter(g=>g.state==="in").length;
+  const at=state.lastOdds?new Date(state.lastOdds).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit",second:"2-digit"}):"";
+  document.getElementById("liveTxt").textContent=`${n} games · ${s} strong${lv?` · ${lv} LIVE`:""}${at?` · updated ${at}`:""}`;
 }
 
 /* ---------- controls + refresh ---------- */
@@ -1871,9 +1923,11 @@ if("serviceWorker" in navigator){
 /* Pause polling while the app is backgrounded (saves phone battery), and pull
    fresh data the moment it comes back — important when you flip back mid-game. */
 let pollA=null,pollB=null;
+let pollFast=false;
 function startPolling(){
   stopPolling();
-  pollA=setInterval(loadSlate,60000);      // odds + scores every minute
+  pollFast=state.games.some(g=>g.state==="in");
+  pollA=setInterval(loadSlate,pollFast?30000:60000);   // scores every 30s while anything is live, else 60s
   pollB=setInterval(queueDetails,300000);  // weather + injuries every 5 min
 }
 function stopPolling(){ clearInterval(pollA); clearInterval(pollB); }
