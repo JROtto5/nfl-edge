@@ -6,7 +6,7 @@
      an old weather reading would be worse than showing nothing — a bettor acting on
      a cached number is exactly the failure this whole tool exists to prevent.
 */
-const SHELL="edge-shell-v4";
+const SHELL="edge-shell-v5";
 const SHELL_FILES=["/","/index.html","/intro","/intro.html","/manifest.webmanifest","/icon-192.png","/icon-512.png"];
 
 self.addEventListener("install",e=>{
@@ -16,6 +16,12 @@ self.addEventListener("install",e=>{
 self.addEventListener("activate",e=>{
   e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==SHELL).map(k=>caches.delete(k)))));
   self.clients.claim();
+});
+self.addEventListener("notificationclick",e=>{
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(cs=>{
+    const c=cs.find(x=>"focus" in x); return c?c.focus():self.clients.openWindow("/");
+  }));
 });
 self.addEventListener("fetch",e=>{
   const req=e.request;

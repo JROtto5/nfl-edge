@@ -167,6 +167,14 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .whyd[open] summary::before{content:"▾ "}
 .sc{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:22px;font-weight:800;margin-left:auto;padding-left:10px}
 .clk{font-size:14px;font-weight:700;color:var(--ink)}
+.badge{background:var(--red);color:#fff;border-radius:9px;font-size:10px;font-weight:800;padding:1px 6px;margin-left:3px;vertical-align:middle}
+.arow{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:8px}
+.arow.unread{border-color:var(--amber)}
+.arow .atext{font-size:14px;font-weight:600}
+.arow .atime{font-size:11px;color:var(--dim);margin-top:2px}
+.catchip.call,.catchip.live{border-color:var(--green);color:var(--green)}
+.catchip.fade{border-color:var(--amber);color:var(--amber)}
+.catchip.steam{border-color:var(--blue,#5aa9ff);color:var(--blue,#5aa9ff)}
 .adv{margin-top:18px;border:1px solid var(--line);border-radius:11px;padding:10px 14px;background:var(--panel)}
 .adv summary{cursor:pointer;font-weight:700;font-size:13.5px;color:var(--dim)}
 .adv[open] summary{margin-bottom:8px}
@@ -283,6 +291,7 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
       <button data-view="props">Props</button>
       <button data-view="track">Results</button>
       <button data-view="parlay">Parlay Builder</button>
+      <button data-view="alerts">🔔 Alerts <span class="badge" id="bellBadge" style="display:none"></span></button>
     </div>
     <div class="seg" id="leagueSeg">
       <button data-lg="all" data-on="1">All</button>
@@ -437,6 +446,10 @@ function applyLineMovement(games,weekKey){
       if(o.spread!=null&&g.spread!=null) g.moveSpread=Math.round((g.spread-o.spread)*10)/10;
       if(o.total!=null&&g.total!=null) g.moveTotal=Math.round((g.total-o.total)*10)/10;
       g.openSpread=o.spread; g.openTotal=o.total;
+      if(!o.alerted&&((g.moveTotal!=null&&Math.abs(g.moveTotal)>=2)||(g.moveSpread!=null&&Math.abs(g.moveSpread)>=1.5))){
+        o.alerted=true; changed=true;
+        pushAlert({kind:"steam",gameId:g.id,text:`LINE MOVE: ${g.name} — ${g.moveTotal!=null&&Math.abs(g.moveTotal)>=2?`total ${o.total} → ${g.total}`:`spread ${o.spread} → ${g.spread}`}`});
+      }
     }
   });
   if(changed) saveLineOpens(weekKey,opens);
@@ -529,6 +542,7 @@ async function loadSlate(){
   if((liveNow.length>0)!==pollFast&&typeof document!=="undefined"&&!document.hidden&&pollA) startPolling();
   render();
   queueDetails();
+  migrateRecords();
   recordStrongEdges();
   gradeRecords();
   refreshLearnedWeights();
@@ -854,6 +868,55 @@ function bestChip(b){
   const src=b.src==="live"?"from this board's own record":b.src==="backtest"?"2025 backtest":"default prior";
   return `<div class="bestchip${b.p>=BEST_MIN_PROB?" good":""}"><b>${b.p}%</b> est. · ${b.stake.dollars>0?`¼-Kelly <b>$${b.stake.dollars}</b> (${b.stake.pct}% of $${state.bankroll})`:"no stake — under break-even"} <span class="src">${src}</span></div>`;
 }
+/* ================= ALERTS =================
+   Everything the board would tap you on the shoulder for: a new strong call, a live
+   bet triggering, a call fading, a line moving, a result. Stored on this device.
+   Phone notifications fire through the service worker when the user has turned them
+   on — but only while the app is running: there is no push server (yet), so nothing
+   can arrive while the app is closed. That limitation is stated in the UI. */
+function pushAlert(a){
+  try{
+    const list=lsGet("edgeboard-alerts-v1",[]);
+    a.ts=Date.now(); a.id=`${a.kind}|${a.gameId||""}|${a.text}`;
+    if(list.some(x=>x.id===a.id)) return;
+    list.unshift(a); lsSet("edgeboard-alerts-v1",list.slice(0,150));
+    notify(a); updateBell();
+  }catch(e){}
+}
+function notify(a){
+  try{
+    if(!lsGet("edgeboard-notify",0)||typeof Notification==="undefined"||Notification.permission!=="granted") return;
+    const reg=navigator.serviceWorker&&navigator.serviceWorker.ready;
+    if(reg&&reg.then) reg.then(r=>r.showNotification("The Edge Board",{body:a.text,icon:"/icon-192.png",badge:"/icon-192.png",tag:a.id})).catch(()=>{});
+  }catch(e){}
+}
+function updateBell(){
+  const b=document.getElementById("bellBadge"); if(!b) return;
+  const seen=lsGet("edgeboard-alerts-seen",0);
+  const n=lsGet("edgeboard-alerts-v1",[]).filter(a=>a.ts>seen).length;
+  b.textContent=n?String(n):""; b.style.display=n?"":"none";
+}
+function renderAlerts(){
+  const box=document.getElementById("board");
+  const list=lsGet("edgeboard-alerts-v1",[]);
+  const seen=lsGet("edgeboard-alerts-seen",0);
+  const supported=typeof Notification!=="undefined";
+  const on=!!lsGet("edgeboard-notify",0)&&supported&&Notification.permission==="granted";
+  const kindTag={call:"NEW CALL",live:"LIVE BET",fade:"FADED",result:"RESULT",steam:"LINE MOVE"};
+  const rows=list.slice(0,100).map(a=>`<div class="arow${a.ts>seen?" unread":""}"><span class="catchip ${a.kind}">${kindTag[a.kind]||a.kind}</span><div class="abody"><div class="atext">${a.text}</div><div class="atime">${new Date(a.ts).toLocaleString(undefined,{weekday:"short",hour:"numeric",minute:"2-digit"})}</div></div></div>`).join("");
+  box.innerHTML=`<div class="note"><b>What you get alerted on:</b> a new strong call, a live bet triggering, a call fading before kickoff, a line moving 2+ points, and every result. Generated while the app is running — it checks every 30–60 seconds.</div>
+    <div class="prow" style="align-items:center">
+      <button class="tbtn" id="notifyBtn" ${!supported?"disabled":""}>${on?"🔔 Phone notifications ON":"🔕 Turn on phone notifications"}</button>
+      <div class="note" style="margin:0;flex:1;min-width:220px">${supported?`Notifications fire through the app's service worker <b>while the app is open or in the background</b>. There is no push server yet, so nothing arrives while the app is fully closed. On iPhone this only works after <b>Add to Home Screen</b>.`:`This browser doesn't expose notifications to web apps. On iPhone, add the board to your Home Screen first.`}</div>
+    </div>
+    ${rows||'<div class="empty">Nothing yet — alerts start when the board makes its first strong call.</div>'}`;
+  document.getElementById("notifyBtn")?.addEventListener("click",()=>{
+    if(typeof Notification==="undefined") return;
+    Notification.requestPermission().then(p=>{ if(p==="granted"){ lsSet("edgeboard-notify",1); notify({id:"test",text:"Notifications are on. You'll hear about new calls, live bets, fades and results while the app is running."}); } renderAlerts(); });
+  });
+  lsSet("edgeboard-alerts-seen",Date.now()); updateBell();
+  updateLive();
+}
 function refreshLearnedWeights(){
   try{ state.learned={}; signalStats(lsGet("edgeboard-record-v1",[])).forEach(s=>{ state.learned[s.cat]={n:s.n,pct:s.pct}; }); }catch(e){}
 }
@@ -1027,8 +1090,11 @@ function edgesForRaw(g){
   if(!indoor){
     // WIND — the strongest, best-documented weather effect on scoring
     if(gust!=null){
-      if(gust>=20) E.push({k:"strong",dir:"UNDER",cat:"wind",play:`UNDER ${total??""} — wind`,why:`Gusts to ${gust} mph. Deep passing and field goals fall off a cliff above 20 mph; this is the most reliable weather signal in football. Also fades the kicker and both QBs' passing props.`});
-      else if(gust>=15) E.push({k:"lean",dir:"UNDER",cat:"wind",play:`Lean UNDER ${total??""} — wind`,why:`Gusts to ${gust} mph. Enough to shorten the passing game and make long field goals dicey.`});
+      // Strong needs 25+ mph GUSTS (was 20 — one forecast number was making a strong
+      // call on its own). Honest caveat carried in the copy: weather cannot be
+      // backtested from ESPN's data, so this weight is hand-set, not measured.
+      if(gust>=25) E.push({k:"strong",dir:"UNDER",cat:"wind",play:`UNDER ${total??""} — wind`,why:`Gusts to ${gust} mph forecast. Deep passing and field goals fall off sharply in wind like this; it's the best-documented weather effect in football. Also fades the kicker and both QBs' passing props. <b>Caveat:</b> this is a forecast, and the wind rule is the one signal here that could NOT be backtested — its weight is hand-set, not measured. Check the wind again right before kickoff.`});
+      else if(gust>=15) E.push({k:"lean",dir:"UNDER",cat:"wind",play:`Lean UNDER ${total??""} — wind`,why:`Gusts to ${gust} mph forecast. Enough to shorten the passing game and make long field goals dicey — a lean, not a play, until it's 25+.`});
     }
     // PRECIP
     if(precip!=null&&precip>=70){
@@ -1481,7 +1547,7 @@ function recordStrongEdges(){
         changed=true;
       } else {
         if(live&&(type==="total"?lineT==null:lineS==null)) return;   // no live line posted — nothing to call
-        const rec={id,gameId:g.id,lg:g.lg,name:g.name,type,dir,live,
+        const rec={id,gameId:g.id,lg:g.lg,name:g.name,type,dir,live,kickoff:new Date(g.date).getTime(),
           lineTotal:lineT,lineSpread:lineS,               // the number we called (frozen)
           closeTotal:lineT,closeSpread:lineS,             // latest seen (moves with the market)
           homeAb:g.home.ab,awayAb:g.away.ab,
@@ -1489,6 +1555,7 @@ function recordStrongEdges(){
           ts:now,firstTs:now,lastStrongTs:now,lastSeenTs:now,
           graded:false,result:null};
         store.push(rec); byId.set(id,rec); changed=true;
+        pushAlert({kind:live?"live":"call",gameId:g.id,text:`${live?"LIVE BET":"NEW CALL"}: ${callNumber(g,dir,live)} — ${g.name}`});
       }
     });
     // 2) mark every OTHER open call on this game as still-watched-but-no-longer-strong.
@@ -1496,16 +1563,38 @@ function recordStrongEdges(){
     //    grading a call the board had already walked away from.
     //    Once the game is LIVE the pregame signals are hidden by design (market closed),
     //    so a pregame call must not be marked faded just because kickoff happened.
+    //    A fade can ONLY be decided by looks taken BEFORE kickoff. Once the game is
+    //    live this pass is skipped entirely — an earlier version kept "watching"
+    //    through the game, saw the (deliberately hidden) pregame signal gone for
+    //    three hours, and tagged a losing call as faded. Never again.
+    if(live) return;
     store.forEach(r=>{
-      if(r.gameId!==g.id||r.graded) return;
-      if(live&&!r.live) return;
+      if(r.gameId!==g.id||r.graded||r.live) return;
       // must flag `changed` too — otherwise on a poll where NOTHING is strong,
       // neither branch above runs, the store is never written, and the fade is
       // silently lost (caught in testing: gap stayed 0 and faded never set).
-      if(!byDir[r.dir]){ r.lastSeenTs=now; changed=true; }
+      if(!byDir[r.dir]){
+        r.lastSeenTs=now; changed=true;
+        if(!r.fadeAlerted&&(now-r.lastStrongTs)/6e4>30){ r.fadeAlerted=true; pushAlert({kind:"fade",gameId:g.id,text:`FADED: ${r.playText} — ${r.name} is no longer strong (still counts if you bet it)`}); }
+      }
     });
   });
   if(changed) lsSet("edgeboard-record-v1",store);
+}
+/* One-time repair. Records tagged "faded" by looks taken AFTER kickoff were tagged
+   by a bug, not by the market — they are un-faded and count. Where kickoff is
+   unknown the call is un-faded too: when in doubt, count it against ourselves. */
+function migrateRecords(){
+  if(lsGet("edgeboard-record-migr",0)>=1) return;
+  const store=lsGet("edgeboard-record-v1",[]);
+  store.forEach(r=>{
+    if(!r.kickoff){ const g=state.games.find(x=>x.id===r.gameId); if(g) r.kickoff=new Date(g.date).getTime(); }
+    if(r.graded&&r.faded){
+      const contaminated=!r.kickoff||(r.lastSeenTs||0)>r.kickoff+5*6e4;
+      if(contaminated){ r.faded=false; r.fadeFixed=true; }
+    }
+  });
+  lsSet("edgeboard-record-v1",store); lsSet("edgeboard-record-migr",1);
 }
 function gradeRecords(){
   const store=lsGet("edgeboard-record-v1",[]);
@@ -1533,9 +1622,11 @@ function gradeRecords(){
     // If we kept watching (lastSeenTs) well past the last time it was strong
     // (lastStrongTs), the call had faded — that's tracked separately rather than
     // being quietly counted in the headline record either way.
-    const gapMin=(rec.lastSeenTs&&rec.lastStrongTs)?(rec.lastSeenTs-rec.lastStrongTs)/6e4:0;
+    const seenPre=rec.kickoff?Math.min(rec.lastSeenTs||0,rec.kickoff):(rec.lastSeenTs||0);
+    const gapMin=(seenPre&&rec.lastStrongTs)?(seenPre-rec.lastStrongTs)/6e4:0;
     rec.faded=gapMin>30;
     rec.graded=true; rec.finalHome=hs; rec.finalAway=as; changed=true;
+    pushAlert({kind:"result",gameId:g.id,text:`${rec.result.toUpperCase()}: ${rec.playText} — Final ${rec.awayAb} ${as}–${hs} ${rec.homeAb}`});
   });
   if(changed) lsSet("edgeboard-record-v1",store);
 }
@@ -1572,7 +1663,7 @@ function clvSummary(store){
 const MIN_SIGNAL_SAMPLE=5;
 function signalStats(store){
   const by={};
-  store.filter(r=>r.graded&&!r.faded&&r.result!=="push").forEach(r=>{
+  store.filter(r=>r.graded&&r.result!=="push").forEach(r=>{
     (r.cats||[]).forEach(c=>{
       const s=by[c]||(by[c]={cat:c,w:0,l:0,clv:[],n:0});
       if(r.result==="win") s.w++; else s.l++;
@@ -1615,7 +1706,7 @@ function renderTrackRecord(){
   const box=document.getElementById("board");
   const store=lsGet("edgeboard-record-v1",[]).slice().sort((a,b)=>b.ts-a.ts);
   const gradedAll=store.filter(r=>r.graded&&r.result!=="push");
-  const graded=gradedAll.filter(r=>!r.faded);                 // headline = calls still live at kickoff
+  const graded=gradedAll;                                     // headline = EVERY graded call, faded ones included
   const fadedGraded=gradedAll.filter(r=>r.faded);
   const w=graded.filter(r=>r.result==="win").length, l=graded.filter(r=>r.result==="loss").length;
   const fw=fadedGraded.filter(r=>r.result==="win").length, fl=fadedGraded.filter(r=>r.result==="loss").length;
@@ -1672,9 +1763,9 @@ function renderTrackRecord(){
     </div>`).join("")}`).join("")}
     </details>
     <div class="note" style="margin-top:14px"><b>How this is tracked, honestly.</b> Every <b>strong</b> edge gets logged the moment it appears and graded once the game goes final — wins and losses both, nothing hidden.
-    <br><br><b>What if a call stops being strong during the week?</b> That happens constantly: a wind forecast softens, a questionable QB gets cleared. Every time the board reloads it re-checks each open call. If a call was still strong the last time the board looked before kickoff, it counts in the record above. If the board watched it stop being strong, it's marked <span class="fadetag">faded before kickoff</span> and kept in a separate line — because grading a play the board had already walked away from would flatter the record either direction.
-    ${fadedGraded.length?`<br><br><b>Faded calls:</b> ${fw}-${fl} — flagged early, no longer strong by kickoff. Shown for completeness, not counted above.`:""}
-    <br><br>One real limitation: this only re-checks while the page is actually open, and it's stored in this browser only. Leave it closed all week and a call can't be re-verified — those still count, but the board never saw them fade. Softer "lean" calls aren't graded at all, since they aren't a specific bet against a number.</div>
+    <br><br><b>What if a call stops being strong during the week?</b> That happens: a wind forecast softens, a questionable QB gets cleared. Every time the board reloads before kickoff it re-checks each open call, and if a call had stopped being strong 30+ minutes before kickoff it's tagged <span class="fadetag">faded before kickoff</span>. <b>It still counts.</b> A call the board put in front of you is a call, and leaving losers out because "we'd walked away" is exactly the kind of convenient accounting this page exists to avoid. The tag is there so you can see which ones they were.
+    ${fadedGraded.length?`<br><br><b>Faded calls:</b> ${fw}-${fl} — counted in the record above, tagged so you can see them.`:""}
+    ${store.some(r=>r.fadeFixed)?`<br><br><b>Correction:</b> ${store.filter(r=>r.fadeFixed).length} call${store.filter(r=>r.fadeFixed).length>1?"s were":" was"} previously tagged faded by a bug — the board kept "watching" after kickoff, when pregame signals are hidden by design, and read that as the call fading. The tag was wrong; the call${store.filter(r=>r.fadeFixed).length>1?"s":""} now count${store.filter(r=>r.fadeFixed).length>1?"":"s"} in the record above.`:""}</div>
     `;
   updateLive();
 }
@@ -1839,6 +1930,7 @@ function card(g){
 }
 function render(){
   if(state.view==="track"){ renderTrackRecord(); return; }
+  if(state.view==="alerts"){ renderAlerts(); return; }
   if(state.view==="parlay"){ renderParlay(); return; }
   if(state.view==="top"){ renderTop(); return; }
   if(state.view==="props"){ renderProps(); return; }
@@ -1881,6 +1973,7 @@ function render(){
   updateLive();
 }
 function updateLive(){
+  updateBell();
   const n=state.games.length, e=state.games.filter(g=>edgesForScored(g).length).length;
   const s=state.games.filter(g=>edgesForScored(g).some(x=>x.k==="strong")).length;
   const lv=state.games.filter(g=>g.state==="in").length;
