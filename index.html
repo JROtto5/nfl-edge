@@ -381,6 +381,11 @@ const ALTITUDE={"Empower Field at Mile High":5280,"Falcon Stadium":6621,"War Mem
 const DOME_HOME_TEAMS=new Set(["ATL","NO","DET","MIN","IND","LV","ARI","DAL","HOU"]); // retractable roofs included
 /* Minimum CURRENT-SEASON games before any "recent form" claim (pace, matchup,
    streaks) is allowed to fire. Early-season averages off 1-2 games are noise. */
+// ESPN conference ids for the FBS conferences (ACC, Big 12, Big Ten, SEC, Pac-12, CUSA,
+// MAC, MWC, Independents, Sun Belt, AAC). Anything else on the FBS scoreboard is an FCS
+// opponent — which matters: the huge-dog edge exists against FBS dogs, not FCS ones.
+const FBS_CONF=new Set([1,4,5,8,9,12,15,17,18,37,151]);
+const isFBS=t=>t&&t.conf!=null&&FBS_CONF.has(t.conf);
 const MIN_FORM_GAMES=3;
 
 /* ---- How much each signal is actually worth ----
@@ -399,7 +404,7 @@ const SIGNAL_WEIGHT={
   matchup:1, rest:1, shortweek:1, shortprep:1, divisional:1, homedog:1,
   rank:1, newcoach:1, coachexp:1, primetime:1, keynumber:1, heat:1,
   domefade:1, neutral:1, chalk:1, ats:1, hotstreak:1, coldstreak:1, qbquestion:1,
-  rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1
+  rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1
 };
 const STACK_STRONG_AT=4;
 /* NFL head coaches for the 2026 season: {TEAM:[name, yearsAsHeadCoach]}.
@@ -526,8 +531,8 @@ function parseGame(e,lg){
   return {
     id:e.id, lg,
     date:e.date, name:e.shortName||e.name,
-    home:{ab:home.team?.abbreviation||"?",nm:home.team?.shortDisplayName||"",logo:home.team?.logo,rec:(home.records||[])[0]?.summary||"",score:home.score,id:home.team?.id,rank:home.curatedRank?.current},
-    away:{ab:away.team?.abbreviation||"?",nm:away.team?.shortDisplayName||"",logo:away.team?.logo,rec:(away.records||[])[0]?.summary||"",score:away.score,id:away.team?.id,rank:away.curatedRank?.current},
+    home:{ab:home.team?.abbreviation||"?",nm:home.team?.shortDisplayName||"",logo:home.team?.logo,rec:(home.records||[])[0]?.summary||"",score:home.score,id:home.team?.id,rank:home.curatedRank?.current,conf:home.team?.conferenceId!=null?Number(home.team.conferenceId):null},
+    away:{ab:away.team?.abbreviation||"?",nm:away.team?.shortDisplayName||"",logo:away.team?.logo,rec:(away.records||[])[0]?.summary||"",score:away.score,id:away.team?.id,rank:away.curatedRank?.current,conf:away.team?.conferenceId!=null?Number(away.team.conferenceId):null},
     spread:o?o.spread:null, details:o?o.details:null, total:o?o.overUnder:null,
     mlHome:o?.moneyline?.home?.close?.odds||o?.homeTeamOdds?.moneyLine||null,
     mlAway:o?.moneyline?.away?.close?.odds||o?.awayTeamOdds?.moneyLine||null,
@@ -790,8 +795,9 @@ const BACKTEST_2025={
   ratings_far:{n:56,pct:42.9,note:"disagree with the market by 6+ pts — LOSES; that far off, the market knows something we don't (capped, never bet)"}
  },
  cfb:{ // 883 FBS regular-season games, real closing lines — the leagues do NOT share priors
-  rank:      {n:79, pct:54.4,note:"ranked team laying 24-27 vs unranked -> DOG covered 54.4% across all 24+ spots. Generic big favorites were 47.9% — the edge is the ranked-vs-unranked part, not the spread size"},
-  rank28:    {n:56, pct:58.9,note:"ranked team laying 28+ vs unranked -> DOG covered 58.9% — the strongest measured spread signal in college"},
+  rank28:    {n:37, pct:62.2,note:"ranked team laying 28+ vs an unranked FBS team -> DOG covered 62.2% — the strongest measured spread signal in college"},
+  rank28fcs: {n:19, pct:52.6,note:"same spot but the dog is FCS -> coin flip (46% in weeks 1-2). Not a play; shown as a note only"},
+  rank:      {n:23, pct:43.5,note:"ranked laying 24-27.5 vs unranked -> dog covered only 43.5%. NEGATIVE — removed as a signal. (An earlier version leaned it off a 54.4% number that the 28+ games were propping up.)"},
   rankclash: {n:50, pct:62.0,note:"ranked vs ranked -> UNDER hit 62% — two real defenses, tighter game scripts"},
   hightotal: {n:116,pct:53.4,note:"closing total 60+ -> UNDER 53.4% — big numbers slightly overshoot"},
   homedog:   {n:290,pct:50.0,note:"college home dogs ATS — dead coin flip, no edge at all"},
@@ -1273,14 +1279,21 @@ function edgesForRaw(g){
     // actually recurs (17 hits on that same slate): a ranked team laying a massive
     // number against an unranked opponent.
     const ranked=r=>typeof r==="number"&&r>=1&&r<=25;
-    const homeRankedBigFav=ranked(hr)&&!ranked(ar)&&g.spread<=-24;
-    const awayRankedBigFav=ranked(ar)&&!ranked(hr)&&g.spread>=24;
+    // 2025 split (n=56 at 28+): dog is FBS -> 62.2% (n=37); dog is FCS -> 52.6% (n=19),
+    // and 46% in weeks 1-2. The 24-27.5 tier went 43.5% (n=23) — it is NOT a signal
+    // and was removed. So: 28+ AND an FBS dog -> strong; 28+ vs FCS -> note only.
+    const homeRankedBigFav=ranked(hr)&&!ranked(ar)&&g.spread<=-28;
+    const awayRankedBigFav=ranked(ar)&&!ranked(hr)&&g.spread>=28;
     if(homeRankedBigFav||awayRankedBigFav){
-      const fav=homeRankedBigFav?g.home.ab:g.away.ab, dog=homeRankedBigFav?g.away.ab:g.home.ab;
-      const rk=homeRankedBigFav?hr:ar;
-      const huge=Math.abs(g.spread)>=28;
-      E.push({k:huge?"strong":"lean",dir:dog,cat:huge?"rank28":"rank",play:`${dog} +${Math.abs(g.spread)} — #${rk} ${fav} laying ${Math.abs(g.spread)} vs unranked`,
-        why:`${fav} (#${rk}) is laying ${Math.abs(g.spread)} against an unranked opponent. Enormous college spreads are hard to cover: winning teams empty the bench, call off the dogs in the 4th, and backdoor points are common. The favorite usually wins — covering by four touchdowns is a different question. Backtested on 2025: this exact spot cashed for the dog ${Math.abs(g.spread)>=28?"58.9% of the time at 28+ (n=56)":"54.4% of the time (n=79), and 58.9% once the number reaches 28"}.`});
+      const favT=homeRankedBigFav?g.home:g.away, dogT=homeRankedBigFav?g.away:g.home;
+      const fav=favT.ab, dog=dogT.ab, rk=homeRankedBigFav?hr:ar, n=Math.abs(g.spread);
+      if(isFBS(dogT)){
+        E.push({k:"strong",dir:dog,cat:"rank28",play:`${dog} +${n} — #${rk} ${fav} laying ${n} vs unranked FBS`,
+          why:`${fav} (#${rk}) is laying ${n} against an unranked FBS opponent. Enormous spreads are hard to cover: winning teams empty the bench, call off the dogs in the 4th, and backdoor points are common. On the 2025 season this exact spot — ranked laying 28+ vs an unranked <b>FBS</b> team — cashed for the dog <b>62.2%</b> of the time (23-14). Against FCS opponents it did not (52.6%), which is why those games don't get this call.`});
+      } else {
+        E.push({k:"lean",dir:null,cat:"rank28fcs",play:`${fav} laying ${n} vs FCS ${dog} — no play`,
+          why:`Looks like the huge-dog spot, but ${dog} is an FCS program${dogT.conf==null?" (or its conference is unlisted)":""}. Measured on 2025, ranked teams laying 28+ against FCS opponents covered about half the time (dog 52.6%, and only 46% in weeks 1-2) — a coin flip, not an edge. Shown so you know why it isn't a call.`});
+      }
     }
     // RANKED vs RANKED — two legitimate defenses and a conservative game script.
     // 2025 backtest: the UNDER hit 62% in these games (31-19). Not thin, not folklore.

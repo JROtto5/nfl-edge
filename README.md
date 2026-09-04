@@ -34,7 +34,7 @@ Walk-forward, no lookahead. Break-even at -110 is 52.4%.
 | Our ratings vs closer, 3+ pt gap, mature teams | 57.1% (n=70) | 55.0% (n=309) |
 | Same, early season | **40.4%** (n=57) → gated off | 48.5% (n=68) → gated off |
 | Disagree with market by 6+ | 42.9% → refused | 50.7% → refused |
-| Ranked laying 24+ vs unranked → dog | — | 54.4% (n=79), 58.9% at 28+ |
+| Ranked laying 28+ vs unranked **FBS** dog | — | 62.2% (n=37); vs FCS 52.6% (no play); 24–27.5 tier 43.5% (removed) |
 | Ranked vs ranked → UNDER | — | 62.0% (n=50) |
 | Always OVER | 52.6% | 49.3% |
 | Home dogs ATS | 52.3% | 50.0% |
