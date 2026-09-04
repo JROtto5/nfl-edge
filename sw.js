@@ -6,7 +6,7 @@
      an old weather reading would be worse than showing nothing — a bettor acting on
      a cached number is exactly the failure this whole tool exists to prevent.
 */
-const SHELL="edge-shell-v5";
+const SHELL="edge-shell-v6";
 const SHELL_FILES=["/","/index.html","/intro","/intro.html","/manifest.webmanifest","/icon-192.png","/icon-512.png"];
 
 self.addEventListener("install",e=>{
@@ -17,10 +17,14 @@ self.addEventListener("activate",e=>{
   e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==SHELL).map(k=>caches.delete(k)))));
   self.clients.claim();
 });
+self.addEventListener("push",e=>{
+  let d={}; try{ d=e.data?e.data.json():{}; }catch(err){ d={body:e.data&&e.data.text()}; }
+  e.waitUntil(self.registration.showNotification(d.title||"The Edge Board",{body:d.body||"",icon:"/icon-192.png",badge:"/icon-192.png",tag:d.tag||"edge",renotify:true,data:{url:d.url||"/#alerts"}}));
+});
 self.addEventListener("notificationclick",e=>{
-  e.notification.close();
+  e.notification.close(); const url=(e.notification.data&&e.notification.data.url)||"/#alerts";
   e.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(cs=>{
-    const c=cs.find(x=>"focus" in x); return c?c.focus():self.clients.openWindow("/");
+    const c=cs.find(x=>"focus" in x); if(c){ c.navigate&&c.navigate(url); return c.focus(); } return self.clients.openWindow(url);
   }));
 });
 self.addEventListener("fetch",e=>{
