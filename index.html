@@ -1407,7 +1407,7 @@ function edgesForCompute(g){
     if(pr.src!=="prior"&&st&&st.n>=40){
       // 100+ games to be promoted to strong, unless both leagues agree on the signal
       const enough=st.n>=100||CROSS_LEAGUE_CATS.has(e.cat);
-      if(e.k==="lean"&&pr.p>=55&&enough&&!WEATHER_CATS.has(e.cat)&&!LEAN_ONLY_CATS.has(e.cat)){ e.k="strong"; e.why+=` <b>Measured strong:</b> this signal hit ${pr.p}% on ${st.n} games (${pr.src==="live"?"this board's own record":"2025 backtest"}).`; }
+      if(e.k==="lean"&&pr.p>=55&&enough&&!WEATHER_CATS.has(e.cat)&&!LEAN_ONLY_CATS.has(e.cat)){ e.k="strong"; e.play=e.play.replace(/^Lean\s+/i,""); e.why+=` <b>Measured strong:</b> this signal hit ${pr.p}% on ${st.n} games (${pr.src==="live"?"this board's own record":"2025 backtest"}).`; }
       if(e.k==="strong"&&pr.p<52.4){ e.k="lean"; e.why+=` <b>Held at lean:</b> measured at ${pr.p}% on ${st.n} games — below break-even, so it can't be a strong call.`; }
     }
   });
