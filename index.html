@@ -2148,7 +2148,7 @@ document.getElementById("leagueSeg").addEventListener("click",e=>{const b=e.targ
 // intro stays open until it's been read once, then folds
 (()=>{ const el=document.getElementById("introNote"); if(!el) return; el.open=!lsGet("edgeboard-intro-read",0); el.addEventListener("toggle",()=>{ if(!el.open) lsSet("edgeboard-intro-read",1); }); })();
 // deep links: #top #props #results #parlay #alerts #data
-(()=>{ const h=(typeof location!=="undefined"?location.hash:"").replace("#",""); const map={top:"top",props:"props",results:"track",track:"track",parlay:"parlay",alerts:"alerts",data:"data",board:"board"};
+(()=>{ const h=String((typeof location!=="undefined"&&location.hash)||"").replace("#",""); const map={top:"top",props:"props",results:"track",track:"track",parlay:"parlay",alerts:"alerts",data:"data",board:"board"};
   if(map[h]){ state.view=map[h]; const seg=document.getElementById("viewSeg"); if(seg) [...seg.children].forEach(x=>x.dataset.on=(x.dataset.view===state.view)?"1":"0"); } })();
 document.getElementById("edgesOnly").addEventListener("change",e=>{state.edgesOnly=e.target.checked;render();});
 document.getElementById("betsOnly").addEventListener("change",e=>{state.betsOnly=e.target.checked;render();});
