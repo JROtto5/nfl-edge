@@ -173,6 +173,22 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .sig{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);color:var(--dim);background:var(--bg2);letter-spacing:.02em}
 .sig.strong{border-color:var(--green);color:var(--green);font-weight:700}
 .sig.ext{border-color:var(--amber);color:var(--amber)}
+.tm[data-team]{cursor:pointer}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.mbox{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:16px 16px 0 0;width:min(680px,100%);max-height:85vh;overflow:auto;padding:16px 16px 28px;position:relative}
+@media (min-width:640px){.modal{align-items:center}.mbox{border-radius:16px}}
+.mclose{position:absolute;top:10px;right:12px;background:var(--bg2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:4px 9px;cursor:pointer}
+.mhead{display:flex;gap:12px;align-items:center;margin-bottom:8px}.mhead img{width:44px;height:44px}
+.mname{font-size:18px;font-weight:800}.msub{font-size:12px;color:var(--dim)}
+.msec{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:14px 0 5px;font-weight:700}
+.mtxt{font-size:13.5px;line-height:1.5}.mrow{padding:3px 0;border-bottom:1px dashed var(--line)}.mrow:last-child{border-bottom:0}
+.mrow a{color:var(--ink)}.amb{color:var(--amber)}
+.bottomnav{display:none}
+@media (max-width:640px){
+  .bottomnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--panel);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  .bottomnav button{flex:1;background:transparent;border:0;color:var(--dim);font:inherit;font-size:12px;font-weight:700;padding:8px 2px;border-radius:9px}
+  .bottomnav button[data-on="1"]{color:var(--ink);background:var(--bg2)}
+}
 .more summary{font-size:12px;color:var(--dim);cursor:pointer;list-style:none;padding:6px 0 2px;user-select:none}
 .more summary::-webkit-details-marker{display:none}
 .more summary::before{content:"▸ "}
@@ -341,6 +357,10 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
     <label class="chk"><input type="checkbox" id="betsOnly"> Bets only</label>
   </div>
 </header>
+<div id="modal" class="modal" hidden></div>
+<nav class="bottomnav" id="bottomNav">
+  <button data-view="board">Board</button><button data-view="top">★ Top</button><button data-view="track">Results</button><button data-view="alerts">🔔</button><button data-view="data">⊞ Data</button>
+</nav>
 
 <main>
   <details class="note intro" id="introNote"><summary><b>How to read this</b></summary><div style="margin-top:8px">Each card leads with <b>the call</b>: bet this side, this much, or no bet. A call only appears when a play is <b>STRONG</b> — hard evidence (a QB ruled out, real line movement, a live pace gap, 25+ mph gusts backed by a second signal) or several weighted signals agreeing. Leans are shown as chips so you can see what's brewing, but they are never a bet. Stakes are quarter-Kelly on your bankroll. Reference only — nothing here places a bet, and never bet what you can't afford to lose.</div></details>
@@ -409,7 +429,7 @@ const SIGNAL_WEIGHT={
   rank:1, newcoach:1, coachexp:1, primetime:1, keynumber:1, heat:1,
   domefade:1, neutral:1, chalk:1, ats:1, hotstreak:1, coldstreak:1, qbquestion:1,
   rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1,
-  unrfavfcs:1, dogimp10:1, lowlast:1, dog7to9:1, late4pm:1, bigfav:1, external:1
+  unrfavfcs:1, dogimp10:1, lowlast:1, dog7to9:1, bigfav:1, smallfav:1, external:1, bothunder:1
 };
 const STACK_STRONG_AT=4;
 /* NFL head coaches for the 2026 season: {TEAM:[name, yearsAsHeadCoach]}.
@@ -570,7 +590,7 @@ async function loadSlate(){
   }
   out.sort((a,b)=>new Date(a.date)-new Date(b.date));
   applyLineMovement(out,range);
-  state.games=out; state.lastOdds=Date.now();
+  state.games=out; state.lastOdds=Date.now(); invalidateEdges();
   // in-progress games carry the live line — re-pull their details on every poll
   const liveNow=out.filter(g=>g.state==="in");
   if(liveNow.length){ liveNow.forEach(g=>{ if(!detailQueue.some(x=>x.id===g.id)) detailQueue.push(g); }); if(!detailRunning) runQueue(); }
@@ -618,6 +638,18 @@ async function runQueue(){
     const want=[]; batch.forEach(g=>{ want.push(sumUrl(g)); if(oddsUrl(g)) want.push(oddsUrl(g)); });
     const got=await jgetMany(want);
     const byUrl=new Map(want.map((u,i)=>[u,got[i]]));
+    // second hop: closing totals of each team's LAST game (finished games never change,
+    // so these are cached in this browser for good)
+    const pastOU=lsGet("edgeboard-pastou-v1",{});
+    const lastIds=new Set();
+    batch.forEach(g=>{ const d=byUrl.get(sumUrl(g)); (d?.lastFiveGames||[]).forEach(t=>{ const evs=t.events||[]; const le=evs[evs.length-1]; if(le?.id&&!pastOU[le.id]) lastIds.add(String(le.id)); }); });
+    if(lastIds.size){
+      const lg=batch[0].lg; const urls=[...lastIds].map(id=>`${CORE}/${CORE_LG[lg]}/events/${id}/competitions/${id}/odds`);
+      const res=await jgetMany(urls);
+      [...lastIds].forEach((id,i)=>{ const co=parseCoreOdds(res[i]?.items); pastOU[id]={t:co.pre?.total??null}; });
+      const keys=Object.keys(pastOU); if(keys.length>800) keys.slice(0,keys.length-800).forEach(k=>delete pastOU[k]);
+      lsSet("edgeboard-pastou-v1",pastOU);
+    }
     await Promise.all(batch.map(async g=>{
       try{
         const d=byUrl.get(sumUrl(g)); if(!d) throw new Error("no summary");
@@ -666,7 +698,9 @@ async function runQueue(){
           const lastEv=curSeasonEvs[curSeasonEvs.length-1];
           const lastPf=lastEv?Number(lastEv.atVs==="vs"?lastEv.homeTeamScore:lastEv.awayTeamScore):null;
           const lastTot=lastEv?Number(lastEv.homeTeamScore)+Number(lastEv.awayTeamScore):null;
-          form[ab]={wins,of:curSeasonEvs.length,lastDate,lastPf:Number.isNaN(lastPf)?null:lastPf,lastTot:Number.isNaN(lastTot)?null:lastTot,streakLen:streak.length,streakType:streak[0]||null,
+          const lastLine=lastEv?.id?(pastOU[String(lastEv.id)]||{}).t:null;
+          const lastOU=(lastLine!=null&&lastTot!=null&&!Number.isNaN(lastTot))?(lastTot>lastLine?"O":lastTot<lastLine?"U":"P"):null;
+          form[ab]={wins,of:curSeasonEvs.length,lastDate,lastPf:Number.isNaN(lastPf)?null:lastPf,lastTot:Number.isNaN(lastTot)?null:lastTot,lastOU,lastLine,streakLen:streak.length,streakType:streak[0]||null,
             avgFor:n>=MIN_FORM_GAMES?pf/n:null, avgAgainst:n>=MIN_FORM_GAMES?pa/n:null};
         });
         // against-the-spread trend — empty early season, populates as games are played;
@@ -690,7 +724,7 @@ async function runQueue(){
           liveSpread:co.live?.spread??null, liveTotal:co.live?.total??null, liveDetails:co.live?.details??null};
       }catch(e){ state.detail[g.id]={got:true,err:true}; }
     }));
-    render();
+    invalidateEdges(); render();
     await new Promise(r=>setTimeout(r,viaApi?40:220));
   }
   detailRunning=false;
@@ -792,7 +826,7 @@ function buildPowerRatings(results){
 const BACKTEST_2025={
  nfl:{ // 2023+2024+2025 regular seasons, 811 games with real closing lines. pct = pooled; note = per season
   ratings:   {n:223,pct:56.5,note:"OUR power-rating line vs the closer, 3+ pt gap, week 10+ — 2023 53.5%, 2024 58.5%, 2025 57.1%. Above break-even every season. Weeks 2-9 are a coin flip or worse, so it's gated"},
-  bothunder: {n:197,pct:58.4,note:"both teams' last game went UNDER -> OVER. 2023 54.9%, 2024 58.6%, 2025 63.2%. Three-for-three. Not live yet — needs each team's last closing total"},
+  bothunder: {n:197,pct:58.4,note:"both teams' last game went UNDER -> OVER. 2023 54.9%, 2024 58.6%, 2025 63.2%. Three-for-three; live"},
   fav10:     {n:73, pct:56.2,note:"favorites of 10+ COVERED — 2023 52.2%, 2024 57.9%, 2025 58.1%. Above break-even every season; thin, so a lean"},
   smallfav:  {n:229,pct:54.6,note:"favorites of 0.5 to 2.5 COVERED — 2023 56.9%, 2024 55.4%, 2025 51.4%. Modest lean"},
   lowlast:   {n:200,pct:54.5,note:"either team's last game <=30 combined -> OVER. 2023 48.8%, 2024 57.1%, 2025 59.4%. Failed 2023, so a lean"},
@@ -972,6 +1006,50 @@ function updateBell(){
   const n=lsGet("edgeboard-alerts-v1",[]).filter(a=>a.ts>seen).length;
   b.textContent=n?String(n):""; b.style.display=n?"":"none";
 }
+/* ================= TEAM RESEARCH PANEL =================
+   Tap a team on any card: record, rank, current-season form with scores, this game's
+   injury report for that team, the signals on this game that involve them, and the
+   latest ESPN news for the team (fetched on open, cached). Honest limit: ESPN has no
+   structured transfer-portal feed — portal/roster items show up only as news headlines. */
+const teamNewsCache={};
+async function openTeam(g,side){
+  const t=g[side], d=state.detail[g.id]||{}, f=(d.form||{})[t.ab]||{};
+  const m=document.getElementById("modal"); if(!m) return;
+  const inj=((d.inj||[]).find(x=>x.ab===t.ab)||{}).list||[];
+  const E=edgesFor(g).filter(e=>e.dir===t.ab||(e.play||"").includes(t.ab));
+  const b=bestPlay(g);
+  const rankTxt=(t.rank>=1&&t.rank<=25)?`#${t.rank} · `:"";
+  const confTxt=g.lg==="cfb"?(isFBS(t)?"FBS":(t.conf!=null?"FCS":"")):"NFL";
+  const formTxt=f.of?`${f.wins}-${f.of-f.wins} this season${f.streakLen>=2?` · ${f.streakType==="W"?"won":"lost"} ${f.streakLen} straight`:""}${f.avgFor!=null?` · ${f.avgFor.toFixed(1)} for / ${f.avgAgainst.toFixed(1)} against`:""}${f.lastTot!=null?` · last game ${f.lastTot} pts${f.lastOU?` (${f.lastOU==="O"?"over":f.lastOU==="U"?"under":"push"} ${f.lastLine})`:""}`:""}`:"No current-season games yet";
+  m.hidden=false;
+  m.innerHTML=`<div class="mbox"><button class="mclose" data-close>✕</button>
+    <div class="mhead">${t.logo?`<img src="${t.logo}" alt="">`:""}<div><div class="mname">${rankTxt}${t.nm||t.ab} <span class="dim">${t.ab}</span></div><div class="msub">${confTxt}${t.rec&&t.rec!=="0-0"?` · ${t.rec}`:""} · ${g.name} · ${fmtTime(g.date)}</div></div></div>
+    <div class="msec">Form</div><div class="mtxt">${formTxt}</div>
+    <div class="msec">Injuries <span class="cnt">${inj.length}</span></div>
+    <div class="mtxt">${inj.length?inj.map(p=>`<div class="mrow"><b>${p.nm}</b> <span class="dim">${p.pos}</span> — <span class="${/out|doubtful|injured reserve/i.test(p.st||"")?"neg":/questionable/i.test(p.st||"")?"amb":""}">${p.st||""}</span>${p.part?` <span class="dim">(${p.part})</span>`:""}</div>`).join(""):(d.got?"No injuries listed by ESPN for this game.":"Loading…")}</div>
+    <div class="msec">Signals on this game involving ${t.ab} <span class="cnt">${E.length}</span></div>
+    <div class="mtxt">${E.length?E.map(e=>`<div class="mrow"><span class="sig ${e.k}">${e.k}</span> ${e.play}</div>`).join(""):"None."}${b?`<div class="mrow" style="margin-top:6px">Board's call on this game: <b>${callNumber(g,b.dir,g.state==="in")}</b>${b.cut?" (strong, below the weekly cut)":""}</div>`:""}</div>
+    <div class="msec">ESPN news · ${t.ab}</div><div class="mtxt" id="mnews">Loading…</div>
+    <div class="mtxt dim" style="font-size:11px;margin-top:10px">Transfer-portal and roster moves have no structured ESPN feed — they appear here only when ESPN writes about them.</div>
+  </div>`;
+  const news=await teamNews(g.lg,t.id);
+  const box=document.getElementById("mnews"); if(!box) return;
+  box.innerHTML=news.length?news.map(a=>`<div class="mrow">${/transfer|portal|commit|decommit|roster/i.test(a.headline)?'<span class="sig ext">portal/roster</span> ':""}<a href="${a.link}" target="_blank" rel="noopener">${a.headline}</a> <span class="dim">${a.date}</span></div>`).join(""):"No recent ESPN stories for this team.";
+}
+async function teamNews(lg,teamId){
+  if(!teamId) return [];
+  const k=`${lg}|${teamId}`; const c=teamNewsCache[k]; if(c&&Date.now()-c.t<20*60e3) return c.items;
+  try{
+    const base=lg==="nfl"?NFL:CFB; const d=await jget(`${base}/news?team=${teamId}&limit=8`);
+    const items=(d.articles||[]).map(a=>({headline:a.headline,date:(a.published||"").slice(0,10),link:a.links?.web?.href||a.links?.mobile?.href||"#"}));
+    teamNewsCache[k]={t:Date.now(),items}; return items;
+  }catch(e){ return []; }
+}
+document.getElementById("board").addEventListener("click",e=>{
+  const tm=e.target.closest(".tm[data-team]"); if(!tm) return;
+  const g=state.games.find(x=>x.id===tm.dataset.gid); if(g) openTeam(g,tm.dataset.team);
+});
+document.getElementById("modal")?.addEventListener("click",e=>{ if(e.target.id==="modal"||e.target.closest("[data-close]")) document.getElementById("modal").hidden=true; });
 /* ================= PRIVATE EXTERNAL PICKS =================
    Picks from an outside source the owner has access to, pasted in by hand (or later
    pulled from a feed they control). Stored ONLY in this browser's localStorage — it is
@@ -1263,7 +1341,16 @@ function fmtLine(v,homeAb,awayAb){
 const WEATHER_CATS=new Set(["wind","precip","cold","heat"]);
 const CROSS_LEAGUE_CATS=new Set([]);   // reserved: a signal positive in both leagues in every season
 const LEAN_ONLY_CATS=new Set(["dog7to9","fav10","bigfav","smallfav","rank28","rankclash","unrfavfcs","lowlast","external"]); // consistent-ish but not every season / thin: never strong on their own // consistent but thin or mechanism-less: never strong
+/* The signal engine used to be re-run for the same game a dozen times per render
+   (card, chips, call box, best play, exposure, top plays…). Memoize per render:
+   invalidateEdges() is called whenever games or details change. */
+const edgeCache=new Map();
+function invalidateEdges(){ edgeCache.clear(); }
 function edgesFor(g){
+  const hit=edgeCache.get(g.id); if(hit&&hit.g===g) return hit.E;
+  const E=edgesForCompute(g); edgeCache.set(g.id,{g,E}); return E;
+}
+function edgesForCompute(g){
   const E=edgesForRaw(g);
   if(g.state!=="in") E.push(...extEdges(g));
   // A forecast can never make a strong call by itself. Weather signals are the one
@@ -1359,6 +1446,15 @@ function edgesForRaw(g){
     if(inSeason&&f.of>=MIN_FORM_GAMES&&f.streakLen>=3&&f.streakType==="L") E.push({k:"lean",dir:null,cat:"coldstreak",play:`${t.ab} is cold (${f.streakLen}-game skid)`,why:`Lost ${f.streakLen} straight this season. Public bettors often keep backing a name brand through a slide — check whether the line has actually adjusted for it.`});
     if(inSeason&&f.of>=MIN_FORM_GAMES&&f.streakLen>=4&&f.streakType==="W") E.push({k:"lean",dir:null,cat:"hotstreak",play:`${t.ab} is hot (${f.streakLen}-game streak)`,why:`Won ${f.streakLen} straight this season. Momentum alone isn't an edge, but paired with a soft line it's worth a second look.`});
   });
+  // THREE-FOR-THREE (2023-25): both teams' last game went UNDER -> this total goes OVER.
+  // NFL 58.4% (55% / 59% / 63%, n=197); college 53.6% (lean). Totals over-correct after
+  // two quiet games. Needs each team's last closing total (fetched + cached above).
+  {
+    const fh=form[g.home.ab], fa=form[g.away.ab];
+    const ok=t=>t&&t.lastOU==="U"&&t.lastDate&&(()=>{const r=Math.round((gameDate-t.lastDate)/864e5); return r>0&&r<=20;})();
+    if(ok(fh)&&ok(fa)&&total!=null) E.push({k:"lean",dir:"OVER",cat:"bothunder",play:`OVER ${total} — both teams just went under`,
+      why:`${g.home.ab}'s last game closed at ${fh.lastLine} and landed on ${fh.lastTot}; ${g.away.ab}'s closed at ${fa.lastLine} and landed on ${fa.lastTot}. After two quiet games the market shades this total down too far: OVER hit <b>${g.lg==="nfl"?"54.9% / 58.6% / 63.2% across 2023-25 (n=197) — every season":"54.8% / 54.3% / 51.9% in college (n=519) — a lean"}</b>.`});
+  }
   // RANKINGS mismatch (college, mostly) — an unranked team getting a small home number vs a ranked visitor
   if(g.lg==="cfb"&&g.spread!=null){
     const hr=g.home.rank,ar=g.away.rank;
@@ -2005,7 +2101,7 @@ function renderTrackRecord(){
       :`<div class="note" style="margin-top:16px">Once calls start grading, this section breaks the record down <b>by signal type</b> — so if wind edges are hitting and model-gap edges aren't, that shows up here instead of hiding inside one blended number.</div>`}
     <div class="sech" style="margin-top:22px">Wall test <span class="cnt">117 rules · 2023 + 2024 + 2025 · 3,371 games</span></div>
     <div class="note">Every candidate rule was run against <b>three full seasons</b> with real closing lines — 2023, 2024 and 2025, both leagues, 117 rule×league tests, 3,371 games. A rule counts as <b>stable</b> only if it hit 55%+ pooled on 60+ games <b>and</b> beat break-even in <i>every one</i> of the three seasons. Almost nothing survives that, which is the point.
-    <br><br><b>Three-for-three:</b> college total 60+ → UNDER (55% / 61% / 53%) · college dog implied ≤10 → OVER (54% / 56% / 58%) · NFL both teams' last game went UNDER → OVER (55% / 59% / 63%, not live yet) · our NFL power ratings vs the closer from week 10 (54% / 59% / 57%) · NFL favorites of 10+ (52% / 58% / 58%, thin).
+    <br><br><b>Three-for-three:</b> college total 60+ → UNDER (55% / 61% / 53%) · college dog implied ≤10 → OVER (54% / 56% / 58%) · NFL both teams' last game went UNDER → OVER (55% / 59% / 63%) · our NFL power ratings vs the closer from week 10 (54% / 59% / 57%) · NFL favorites of 10+ (52% / 58% / 58%, thin).
     <br><br><b>Two out of three — leans with a prior, never a call alone:</b> ranked vs ranked UNDER (51% / 56% / 62%) · unranked laying 21+ vs FCS → favorite (<b>43%</b> / 58% / 59%) · NFL dog +7 to +9.5 (49% / 66% / 58%) · either team's last game ≤30 → OVER · NFL small favorites (57% / 55% / 51%).
     <br><br><b>Looked great for one season, died in another — removed:</b> ranked laying 28+ → dog (51% / 43% / 62%) · team held to ≤7 last game · fade the rested college team · NFL primetime dog (37% in 2024) · CFB total ≤45 UNDER (38% in 2024) · NFL 4pm-window OVER (48% in 2023) · Sunday-night UNDER (50% in 2025) · our <b>college</b> power ratings (49% / 48% / 55%).
     <br><br><b>Negative all three years:</b> college home dogs in the final two weeks of the regular season (40% / 38% / 38%). <b>Dead folklore, three years:</b> home dogs, always-over, divisional unders, revenge games, letdown/bounce-back spots, rest in either direction.</div>
@@ -2168,8 +2264,8 @@ function card(g){
   return `<div class="card${strong?" hot":""}${live?" islive":""}">
     <div class="ctop">
       <div class="teams">
-        <div class="tm${g.favAb===g.away.ab?" fav":""}">${g.away.logo?`<img src="${g.away.logo}" alt="">`:""}${rankTag(g.away.rank)}<span>${g.away.ab}</span>${recTag(g.away.rec)}${live||g.state==="post"?`<span class="sc">${g.away.score??""}</span>`:""}</div>
-        <div class="tm${g.favAb===g.home.ab?" fav":""}">${g.home.logo?`<img src="${g.home.logo}" alt="">`:""}${rankTag(g.home.rank)}<span>${g.home.ab}</span>${recTag(g.home.rec)}${live||g.state==="post"?`<span class="sc">${g.home.score??""}</span>`:""}</div>
+        <div class="tm${g.favAb===g.away.ab?" fav":""}" data-team="away" data-gid="${g.id}" title="Team research">${g.away.logo?`<img src="${g.away.logo}" alt="">`:""}${rankTag(g.away.rank)}<span>${g.away.ab}</span>${recTag(g.away.rec)}${live||g.state==="post"?`<span class="sc">${g.away.score??""}</span>`:""}</div>
+        <div class="tm${g.favAb===g.home.ab?" fav":""}" data-team="home" data-gid="${g.id}" title="Team research">${g.home.logo?`<img src="${g.home.logo}" alt="">`:""}${rankTag(g.home.rank)}<span>${g.home.ab}</span>${recTag(g.home.rec)}${live||g.state==="post"?`<span class="sc">${g.home.score??""}</span>`:""}</div>
       </div>
       <div class="when"><div class="st${live?" livegame":""}">${live?"● LIVE":(g.state==="post"?"FINAL":fmtTime(g.date))}</div>
         <div class="${live?"clk":""}">${live||g.state==="post"?g.short:(g.nextWeek?"next week":(g.venue||"").slice(0,26))}</div></div>
@@ -2191,6 +2287,7 @@ function card(g){
   </div>`;
 }
 function render(){
+  invalidateEdges();
   recomputeExposure();
   if(state.view==="track"){ renderTrackRecord(); return; }
   if(state.view==="alerts"){ renderAlerts(); return; }
@@ -2256,15 +2353,16 @@ function updateLive(){
 }
 
 /* ---------- controls + refresh ---------- */
-document.getElementById("viewSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
-  state.view=b.dataset.view;[...e.currentTarget.children].forEach(x=>x.dataset.on=(x===b)?"1":"0");
-  try{ history.replaceState(null,"",state.view==="board"?" ":"#"+(state.view==="track"?"results":state.view)); }catch(err){}
-  const boardOnly=state.view==="board";
-  document.getElementById("leagueSeg").style.display=(boardOnly||state.view==="data")?"":"none";
-  document.getElementById("edgesOnly").closest("label").style.display=boardOnly?"":"none";
-  document.getElementById("outdoorOnly").closest("label").style.display=boardOnly?"":"none";
-  document.getElementById("betsOnly").closest("label").style.display=boardOnly?"":"none";
-  render();});
+function setView(v){
+  state.view=v;
+  document.querySelectorAll("#viewSeg [data-view],#bottomNav [data-view]").forEach(x=>x.dataset.on=(x.dataset.view===v)?"1":"0");
+  try{ history.replaceState(null,"",v==="board"?" ":"#"+(v==="track"?"results":v)); }catch(err){}
+  const boardOnly=v==="board";
+  document.getElementById("leagueSeg").style.display=(boardOnly||v==="data")?"":"none";
+  ["edgesOnly","outdoorOnly","betsOnly"].forEach(id=>{ const el=document.getElementById(id); if(el&&el.closest("label")) el.closest("label").style.display=boardOnly?"":"none"; });
+  render();
+}
+["viewSeg","bottomNav"].forEach(id=>document.getElementById(id)?.addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(!b)return;setView(b.dataset.view);}));
 document.getElementById("board").addEventListener("change",e=>{
   const cb=e.target.closest("[data-leg]"); if(!cb) return;
   if(cb.checked) state.parlayPicks.add(cb.dataset.leg); else state.parlayPicks.delete(cb.dataset.leg);
@@ -2278,7 +2376,7 @@ document.getElementById("leagueSeg").addEventListener("click",e=>{const b=e.targ
 (()=>{ const el=document.getElementById("introNote"); if(!el) return; el.open=!lsGet("edgeboard-intro-read",0); el.addEventListener("toggle",()=>{ if(!el.open) lsSet("edgeboard-intro-read",1); }); })();
 // deep links: #top #props #results #parlay #alerts #data
 (()=>{ const h=String((typeof location!=="undefined"&&location.hash)||"").replace("#",""); const map={top:"top",props:"props",results:"track",track:"track",parlay:"parlay",alerts:"alerts",data:"data",board:"board",ext:"ext",private:"ext"};
-  if(map[h]){ state.view=map[h]; const seg=document.getElementById("viewSeg"); if(seg) [...seg.children].forEach(x=>x.dataset.on=(x.dataset.view===state.view)?"1":"0"); } })();
+  if(map[h]){ state.view=map[h]; document.querySelectorAll("#viewSeg [data-view],#bottomNav [data-view]").forEach(x=>x.dataset.on=(x.dataset.view===state.view)?"1":"0"); } })();
 document.getElementById("edgesOnly").addEventListener("change",e=>{state.edgesOnly=e.target.checked;render();});
 document.getElementById("betsOnly").addEventListener("change",e=>{state.betsOnly=e.target.checked;render();});
 document.getElementById("outdoorOnly").addEventListener("change",e=>{state.outdoorOnly=e.target.checked;render();});
@@ -2302,7 +2400,7 @@ let pollFast=false;
 function startPolling(){
   stopPolling();
   pollFast=state.games.some(g=>g.state==="in");
-  pollA=setInterval(loadSlate,pollFast?30000:60000);   // scores every 30s while anything is live, else 60s
+  pollA=setInterval(loadSlate,pollFast?20000:60000);   // scores every 20s while anything is live, else 60s
   pollB=setInterval(queueDetails,300000);  // weather + injuries every 5 min
 }
 function stopPolling(){ clearInterval(pollA); clearInterval(pollB); }
