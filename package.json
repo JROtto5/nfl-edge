@@ -1,0 +1,9 @@
+{
+  "name": "nfl-edge",
+  "private": true,
+  "version": "1.0.0",
+  "description": "The Edge Board — live NFL/CFB betting-edge board",
+  "dependencies": {
+    "@vercel/blob": "^1.1.1"
+  }
+}

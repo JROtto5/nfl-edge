@@ -1,0 +1,11 @@
+name: grade
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run the Edge Board grader
+        run: curl -fsS --max-time 90 "https://nfl-edge-kappa.vercel.app/api/cron/grade?key=${{ secrets.CRON_KEY }}" | head -c 600
