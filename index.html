@@ -429,7 +429,7 @@ const SIGNAL_WEIGHT={
   rank:1, newcoach:1, coachexp:1, primetime:1, keynumber:1, heat:1,
   domefade:1, neutral:1, chalk:1, ats:1, hotstreak:1, coldstreak:1, qbquestion:1,
   rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1,
-  unrfavfcs:1, dogimp10:1, lowlast:1, dog7to9:1, bigfav:1, smallfav:1, external:1, bothunder:1
+  unrfavfcs:1, dogimp10:1, lowlast:1, dog7to9:1, bigfav:1, smallfav:1, external:1, bothunder:1, priorblend:1
 };
 const STACK_STRONG_AT=4;
 /* NFL head coaches for the 2026 season: {TEAM:[name, yearsAsHeadCoach]}.
@@ -753,6 +753,14 @@ const RATINGS_EDGE_MIN_N={nfl:9,cfb:5};  // games BOTH teams need before a ratin
 const RATINGS_STRONG_N=9;                 // ...and before it can be called strong
 const RATINGS_GAP_MIN=3;                  // points of disagreement with the market to fire
 const RATINGS_TOO_FAR=6;                  // beyond this the model is probably missing news — no bet
+/* Last season's final opponent-adjusted ratings (college, FBS teams, 2025). Used ONLY in
+   the first four weeks, blended 8-games-strong with the current season: measured
+   walk-forward on 2023-25, betting our blended line at a 3-6 pt gap in weeks 1-4 went
+   52% / 69% / 58% (n=199). From week 5 on the blend adds nothing, so it switches off.
+   The NFL version was tested and HURT — NFL priors are deliberately not used. */
+const PRIOR_CFB_2025={"KSU":21.3,"ISU":20.7,"UNLV":13.8,"KU":16.6,"FRES":8.5,"WKU":4.8,"SHSU":-16,"HAW":8.7,"STAN":7.8,"USF":28.7,"BOIS":18.3,"RUTG":14.4,"OHIO":6.4,"BGSU":-4.8,"NCSU":17.3,"ECU":18.2,"UCF":10.5,"JVST":1.2,"DEL":-2.7,"ULM":-13.3,"AKR":-9.4,"WYO":0.8,"MIZ":26.4,"DUKE":18.1,"OKST":-2.7,"MINN":13,"BUFF":-4.6,"HOU":17.5,"UAB":-3.7,"CIN":17.8,"NEB":19.8,"WIS":16.6,"M-OH":5.5,"SDSU":15.6,"ILL":25.2,"ARMY":10.1,"MSU":14.4,"WMU":7.9,"WAKE":15.1,"KENN":8.5,"CLT":-11.6,"APP":-3.9,"BAY":14.4,"AUB":23.2,"COLO":8.1,"GT":18.9,"FIU":2.5,"SJSU":-2.1,"CMU":0.7,"OSU":44.6,"TEX":28.4,"PSU":29.2,"NEV":-0.9,"CLEM":19.7,"LSU":22.9,"UGA":35,"MRSH":3.3,"ORE":41.9,"FSU":24.5,"ALA":33.5,"ASU":19.8,"MICH":29.2,"UNM":14.1,"FLA":21.1,"SMU":22.1,"OU":31.8,"TA&M":33.1,"UTSA":13.6,"IU":49,"ODU":15.1,"MISS":32.2,"GAST":-11,"TENN":25.6,"SYR":-0.2,"USM":1.8,"MSST":17.1,"MD":12.1,"FAU":-1.5,"PUR":9.9,"BALL":-10.3,"TULN":16.9,"NU":17.6,"PITT":21.3,"NAVY":12.3,"UK":16.1,"TOL":18.3,"BC":3.2,"WVU":7.5,"CONN":8.2,"LOU":21.3,"AFA":5.1,"MASS":-25.3,"TEM":3.7,"NIU":-4.7,"LIB":0.5,"ARK":18.9,"MEM":17,"IOWA":32.8,"UVA":21.6,"CCU":-6.3,"JMU":23.5,"VAN":33.2,"MTSU":-6,"ARST":-1.2,"USA":-2.6,"TROY":2.7,"USC":33.6,"MOST":0.3,"LT":6.9,"USU":11.8,"UTEP":-7.5,"BYU":31.3,"UL":-1.8,"RICE":-6.2,"TXST":7.5,"EMU":-5.3,"UNT":24.4,"TLSA":-1.5,"NMSU":-5.1,"GASO":-2.7,"WSU":16,"ORST":-1.8,"CAL":7.4,"ARIZ":26.6,"UCLA":10.9,"UTAH":37.1,"WASH":29.8,"CSU":-0.9,"MIA":35.9,"ND":41.6,"SC":19.8,"VT":8,"UNC":2.7,"TCU":19.7,"TTU":43.9,"KENT":-7.6};
+const PRIOR_K=8;              // prior counts as 8 games of evidence
+const PRIOR_MAX_WEEKS=4;      // blend is used only while the season is this young
 const MIN_RATED_GAMES=3;      // a team needs this many results before it gets a rating
 const HFA={nfl:2.0,cfb:2.5};  // home-field advantage in points (standard figures)
 async function loadSeasonResults(){
@@ -829,6 +837,7 @@ const BACKTEST_2025={
   bothunder: {n:197,pct:58.4,note:"both teams' last game went UNDER -> OVER. 2023 54.9%, 2024 58.6%, 2025 63.2%. Three-for-three; live"},
   fav10:     {n:73, pct:56.2,note:"favorites of 10+ COVERED — 2023 52.2%, 2024 57.9%, 2025 58.1%. Above break-even every season; thin, so a lean"},
   smallfav:  {n:229,pct:54.6,note:"favorites of 0.5 to 2.5 COVERED — 2023 56.9%, 2024 55.4%, 2025 51.4%. Modest lean"},
+  pace:      {n:122,pct:54.1,note:"OUR totals model vs the closing total, 8+ pt gap: 50% / 56% / 56%. Barely above break-even — lean only"},
   lowlast:   {n:200,pct:54.5,note:"either team's last game <=30 combined -> OVER. 2023 48.8%, 2024 57.1%, 2025 59.4%. Failed 2023, so a lean"},
   dog7to9:   {n:120,pct:57.5,note:"dogs of +7 to +9.5 COVERED — 2023 48.6%, 2024 65.8%, 2025 57.8%. Two big years, one miss; lean only"},
   homedog:   {n:310,pct:48.1,note:"home dogs ATS — 45.6% / 45.9% / 52.3%. Not an edge, three years running"},
@@ -850,6 +859,8 @@ const BACKTEST_2025={
   bothunder: {n:519,pct:53.6,note:"both teams' last game went UNDER -> OVER. 54.8% / 54.3% / 51.9%. Weaker than the NFL version"},
   rank28:    {n:100,pct:53.0,note:"ranked laying 28+ vs unranked FBS -> dog. 51.4% / 42.9% / 62.2%. One good year. Lean at most"},
   rank28fcs: {n:34, pct:50.0,note:"same spot vs FCS -> coin flip. Note only"},
+  priorblend:{n:199,pct:59.0,note:"weeks 1-4: last season's ratings blended with this season's vs the closer, 3-6 pt gap. 52% / 69% / 58%. Lean with a good prior"},
+  pace:      {n:480,pct:49.6,note:"OUR totals model (offense/defense ratings) vs the closing total, 8+ pt gap: 54% / 40% / 53%. The market's totals beat ours in college — held at lean"},
   ratings:   {n:1025,pct:50.4,note:"OUR ratings vs the closer in college: 49.2% / 47.5% / 55.0%. Does not hold — held at lean"},
   homedog:   {n:838,pct:50.2,note:"college home dogs ATS — nothing, three years"},
   base_over: {n:2560,pct:50.9,note:"ALWAYS OVER — no lean either way in college"},
@@ -928,6 +939,14 @@ function kellyStake(p,odds){
   return {f:frac,pct:Math.round(frac*1000)/10,dollars:Math.floor(frac*(state.bankroll||0)),capped:exposureFactor<1};
 }
 // The single best STRONG directional play on a game, with its estimated probability.
+// Early-season college rating: current-season rating blended with last season's final.
+function seasonWeekOf(g){ const d=new Date(g.date); const y=d.getMonth()>=6?d.getFullYear():d.getFullYear()-1; const start=new Date(y,7,24); return Math.max(1,Math.ceil((d-start)/(7*864e5))); }
+function gamesPlayed(ab){ let n=0; (state.results||[]).forEach(r=>{ if(r.home===ab||r.away===ab) n++; }); return n; }
+function blendedRating(g,t){
+  const prior=PRIOR_CFB_2025[t.ab]; if(prior==null) return null;
+  const P=(state.power||{})[t.ab]; const n=P?P.n:gamesPlayed(t.ab); const cur=P?P.rating:null;
+  return cur==null?prior:(n*cur+PRIOR_K*prior)/(n+PRIOR_K);
+}
 function bestPlayRaw(g){
   const E=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
   const byDir={}; E.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
@@ -1340,7 +1359,7 @@ function fmtLine(v,homeAb,awayAb){
 // only the in-play signals.
 const WEATHER_CATS=new Set(["wind","precip","cold","heat"]);
 const CROSS_LEAGUE_CATS=new Set([]);   // reserved: a signal positive in both leagues in every season
-const LEAN_ONLY_CATS=new Set(["dog7to9","fav10","bigfav","smallfav","rank28","rankclash","unrfavfcs","lowlast","external"]); // consistent-ish but not every season / thin: never strong on their own // consistent but thin or mechanism-less: never strong
+const LEAN_ONLY_CATS=new Set(["dog7to9","fav10","bigfav","smallfav","rank28","rankclash","unrfavfcs","lowlast","external","priorblend","pace"]); // consistent-ish but not every season / thin: never strong on their own // consistent but thin or mechanism-less: never strong
 /* The signal engine used to be re-run for the same game a dozen times per render
    (card, chips, call box, best play, exposure, top plays…). Memoize per render:
    invalidateEdges() is called whenever games or details change. */
@@ -1481,6 +1500,21 @@ function edgesForRaw(g){
           why:`Looks like the huge-dog spot, but ${dog} is an FCS program${dogT.conf==null?" (or its conference is unlisted)":""}. Measured on 2025, ranked teams laying 28+ against FCS opponents covered about half the time (dog 52.6%, and only 46% in weeks 1-2) — a coin flip, not an edge. Shown so you know why it isn't a call.`});
       }
     }
+    // EARLY-SEASON PRIOR BLEND (weeks 1-4 only): last season's ratings, 8-games-strong,
+    // blended with this season's. Walk-forward 2023-25: 52% / 69% / 58% at a 3-6 pt gap
+    // (n=199). Two strong years and one break-even, so a lean with a good prior.
+    if(g.spread!=null&&Math.abs(g.spread)<21&&seasonWeekOf(g)<=PRIOR_MAX_WEEKS){
+      const rh=blendedRating(g,g.home), ra=blendedRating(g,g.away);
+      if(rh!=null&&ra!=null){
+        const ours=-((rh-ra)+(g.neutral?0:(HFA.cfb||2.5)));
+        const gap=Math.round((ours-g.spread)*2)/2;
+        if(Math.abs(gap)>=3&&Math.abs(gap)<6){
+          const side=gap<0?g.home.ab:g.away.ab;
+          E.push({k:"lean",dir:side,cat:"priorblend",play:`${side} — early-season ratings like them`,
+            why:`Last season's final ratings, blended with what's been played so far, make this ${ours>0?"+":""}${ours.toFixed(1)} for the home side against a market ${g.spread>0?"+":""}${g.spread} — a ${Math.abs(gap)}-point gap. Early college lines lean on hype; last year's strength is a better anchor. Walk-forward 2023-25 in weeks 1-4 this hit <b>52% / 69% / 58%</b> (n=199). Switches off after week ${PRIOR_MAX_WEEKS}.`});
+        }
+      }
+    }
     // RANKED vs RANKED — two legitimate defenses and a conservative game script.
     // 2025 backtest: the UNDER hit 62% in these games (31-19). Not thin, not folklore.
     if(ranked(hr)&&ranked(ar)&&total!=null){
@@ -1546,7 +1580,7 @@ function edgesForRaw(g){
       const gap=total-projected;
       if(Math.abs(gap)>=6){
         const dir=gap>0?"UNDER":"OVER";
-        E.push({k:Math.abs(gap)>=10?"strong":"lean",dir,cat:"pace",
+        E.push({k:"lean",dir,cat:"pace",
           play:`Lean ${dir} ${total} — pace mismatch`,
           why:`Based on each team's last ${Math.min(hf.of,af.of)} game${Math.min(hf.of,af.of)===1?"":"s"} this season, this matchup projects to about ${projected.toFixed(1)} combined points — the posted total of ${total} is ${Math.abs(gap).toFixed(1)} points ${gap>0?"higher":"lower"} than their recent scoring pace.`});
       }
@@ -2104,6 +2138,7 @@ function renderTrackRecord(){
     <br><br><b>Three-for-three:</b> college total 60+ → UNDER (55% / 61% / 53%) · college dog implied ≤10 → OVER (54% / 56% / 58%) · NFL both teams' last game went UNDER → OVER (55% / 59% / 63%) · our NFL power ratings vs the closer from week 10 (54% / 59% / 57%) · NFL favorites of 10+ (52% / 58% / 58%, thin).
     <br><br><b>Two out of three — leans with a prior, never a call alone:</b> ranked vs ranked UNDER (51% / 56% / 62%) · unranked laying 21+ vs FCS → favorite (<b>43%</b> / 58% / 59%) · NFL dog +7 to +9.5 (49% / 66% / 58%) · either team's last game ≤30 → OVER · NFL small favorites (57% / 55% / 51%).
     <br><br><b>Looked great for one season, died in another — removed:</b> ranked laying 28+ → dog (51% / 43% / 62%) · team held to ≤7 last game · fade the rested college team · NFL primetime dog (37% in 2024) · CFB total ≤45 UNDER (38% in 2024) · NFL 4pm-window OVER (48% in 2023) · Sunday-night UNDER (50% in 2025) · our <b>college</b> power ratings (49% / 48% / 55%).
+    <br><br><b>Model findings:</b> our NFL power ratings beat the closer from week 10 in all three seasons and every attempt to add prior-season strength made them <i>worse</i> (blending toward the market removes the edge). College is the reverse: current-season ratings never beat the closer, but last season's ratings blended in for weeks 1-4 went 52% / 69% / 58% — now live as a lean. Our totals models (offense/defense ratings, simple averages, market blends) do <b>not</b> beat closing totals in either league, so total projections are shown as context and never as a call.
     <br><br><b>Negative all three years:</b> college home dogs in the final two weeks of the regular season (40% / 38% / 38%). <b>Dead folklore, three years:</b> home dogs, always-over, divisional unders, revenge games, letdown/bounce-back spots, rest in either direction.</div>
     <div class="sech" style="margin-top:22px">Signal priors <span class="cnt">2023–2025 · 3,371 real games, closing lines</span></div>
     <div class="note">Before this season had any results, the simple rule behind each soft signal was run against every 2025 regular-season game with its real closing line — <b>272 NFL</b> and <b>883 college</b>. These measured rates now seed the signal weights until the board has its own graded sample, and they are kept <b>per league</b> because the two disagree (the NFL leaned OVER last year; college leaned UNDER). Break-even at -110 is <b>52.4%</b>.
@@ -2242,6 +2277,7 @@ function projBlock(g){
     </div>
     ${(p.spreadEdge!=null||p.totalEdge!=null)?`<div class="pedges">${edgeChip(p.spreadEdge,"spread")}${edgeChip(p.totalEdge,"total")}</div>`:""}
     ${noMarket?`<div class="pnote">DraftKings hasn't posted this game yet — everything above is the model's own number, so there's nothing to bet against it until a line appears.</div>`:""}
+    ${p.totalEdge!=null?`<div class="pnote">Total projection is <b>context only</b>: walk-forward on 2023-25 our totals models did not beat the closing total (college 48%, NFL 53%), so no total edge is ever claimed from it.</div>`:""}
     ${p.blowout?`<div class="pnote">Blowout-sized spread — the model is measurably unreliable at this size (still ~9-18 pts off), so <b>no spread edge is claimed</b>. The total is modelled separately and is unaffected by that.</div>`:""}
     <details class="pwhy"><summary>How this number was built</summary>
       <div><b>Spread:</b> ${p.spreadBasis||"no model input available"}.<br><b>Total:</b> ${p.totalBasis}.
