@@ -399,7 +399,7 @@ function parseCoreOdds(items){
   return out;
 }
 const state={league:"all",edgesOnly:true,outdoorOnly:false,games:[],detail:{},theme:null,lastOdds:0,
-  view:"board",parlayPicks:new Set(),stake:10,sort:"time",bankroll:lsGet("edgeboard-bankroll",1000),
+  view:"board",parlayPicks:new Set(),stake:10,sort:"time",wk:{},bankroll:lsGet("edgeboard-bankroll",1000),
   power:{},results:[],powerAt:0,learned:{}};
 
 /* High-altitude venues (thin air -> more scoring, harder cardio for visitors,
@@ -433,7 +433,7 @@ const SIGNAL_WEIGHT={
   matchup:1, rest:1, shortweek:1, shortprep:1, divisional:1, homedog:1,
   rank:1, newcoach:1, coachexp:1, primetime:1, keynumber:1, heat:1,
   domefade:1, neutral:1, chalk:1, ats:1, hotstreak:1, coldstreak:1, qbquestion:1,
-  rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1, steamunr:1, keycross:1,
+  rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1, steamunr:1, keycross:1, mtotal:2,
   unrfavfcs:1, dogimp10:1, lowlast:1, dog7to9:1, bigfav:1, smallfav:1, external:1, bothunder:1, priorblend:1
 };
 const STACK_STRONG_AT=4;
@@ -585,8 +585,8 @@ async function loadSlate(){
   const range=`${ymd(mon)}-${ymd(sun)}`;
   const out=[];
   const jobs=[
-    jget(`${NFL}/scoreboard?dates=${range}&limit=100`).then(d=>(d.events||[]).forEach(e=>out.push(parseGame(e,"nfl")))).catch(()=>{}),
-    jget(`${CFB}/scoreboard?groups=80&dates=${range}&limit=400`).then(d=>(d.events||[]).forEach(e=>out.push(parseGame(e,"cfb")))).catch(()=>{})
+    jget(`${NFL}/scoreboard?dates=${range}&limit=100`).then(d=>{ if(d.week?.number) state.wk.nfl=d.week.number; (d.events||[]).forEach(e=>out.push(parseGame(e,"nfl"))); }).catch(()=>{}),
+    jget(`${CFB}/scoreboard?groups=80&dates=${range}&limit=400`).then(d=>{ if(d.week?.number) state.wk.cfb=d.week.number; (d.events||[]).forEach(e=>out.push(parseGame(e,"cfb"))); }).catch(()=>{})
   ];
   await Promise.all(jobs);
   // if a league has nothing this window, pull its next games so the board isn't blank
@@ -649,7 +649,7 @@ async function runQueue(){
     // so these are cached in this browser for good)
     const pastOU=lsGet("edgeboard-pastou-v1",{});
     const lastIds=new Set();
-    batch.forEach(g=>{ const d=byUrl.get(sumUrl(g)); (d?.lastFiveGames||[]).forEach(t=>{ const evs=t.events||[]; const le=evs[evs.length-1]; if(le?.id&&!pastOU[le.id]) lastIds.add(String(le.id)); }); });
+    batch.forEach(g=>{ const d=byUrl.get(sumUrl(g)); (d?.lastFiveGames||[]).forEach(t=>{ (t.events||[]).slice(-3).forEach(le=>{ if(le?.id&&!pastOU[le.id]) lastIds.add(String(le.id)); }); }); });
     if(lastIds.size){
       const lg=batch[0].lg; const urls=[...lastIds].map(id=>`${CORE}/${CORE_LG[lg]}/events/${id}/competitions/${id}/odds`);
       const res=await jgetMany(urls);
@@ -707,7 +707,8 @@ async function runQueue(){
           const lastTot=lastEv?Number(lastEv.homeTeamScore)+Number(lastEv.awayTeamScore):null;
           const lastLine=lastEv?.id?(pastOU[String(lastEv.id)]||{}).t:null;
           const lastOU=(lastLine!=null&&lastTot!=null&&!Number.isNaN(lastTot))?(lastTot>lastLine?"O":lastTot<lastLine?"U":"P"):null;
-          form[ab]={wins,of:curSeasonEvs.length,lastDate,lastPf:Number.isNaN(lastPf)?null:lastPf,lastTot:Number.isNaN(lastTot)?null:lastTot,lastOU,lastLine,streakLen:streak.length,streakType:streak[0]||null,
+          const ouLast3=curSeasonEvs.slice(-3).map(x=>{ const ln=(pastOU[String(x.id)]||{}).t; const tt=Number(x.homeTeamScore)+Number(x.awayTeamScore); return (ln==null||Number.isNaN(tt))?null:(tt>ln?"O":tt<ln?"U":"P"); });
+          form[ab]={wins,of:curSeasonEvs.length,lastDate,lastPf:Number.isNaN(lastPf)?null:lastPf,lastTot:Number.isNaN(lastTot)?null:lastTot,lastOU,lastLine,ouLast3,pfAll:n?pf/n:null,paAll:n?pa/n:null,streakLen:streak.length,streakType:streak[0]||null,
             avgFor:n>=MIN_FORM_GAMES?pf/n:null, avgAgainst:n>=MIN_FORM_GAMES?pa/n:null};
         });
         // against-the-spread trend — empty early season, populates as games are played;
@@ -767,6 +768,12 @@ const RATINGS_TOO_FAR=6;                  // beyond this the model is probably m
    52% / 69% / 58% (n=199). From week 5 on the blend adds nothing, so it switches off.
    The NFL version was tested and HURT — NFL priors are deliberately not used. */
 const PRIOR_CFB_2025={"KSU":21.3,"ISU":20.7,"UNLV":13.8,"KU":16.6,"FRES":8.5,"WKU":4.8,"SHSU":-16,"HAW":8.7,"STAN":7.8,"USF":28.7,"BOIS":18.3,"RUTG":14.4,"OHIO":6.4,"BGSU":-4.8,"NCSU":17.3,"ECU":18.2,"UCF":10.5,"JVST":1.2,"DEL":-2.7,"ULM":-13.3,"AKR":-9.4,"WYO":0.8,"MIZ":26.4,"DUKE":18.1,"OKST":-2.7,"MINN":13,"BUFF":-4.6,"HOU":17.5,"UAB":-3.7,"CIN":17.8,"NEB":19.8,"WIS":16.6,"M-OH":5.5,"SDSU":15.6,"ILL":25.2,"ARMY":10.1,"MSU":14.4,"WMU":7.9,"WAKE":15.1,"KENN":8.5,"CLT":-11.6,"APP":-3.9,"BAY":14.4,"AUB":23.2,"COLO":8.1,"GT":18.9,"FIU":2.5,"SJSU":-2.1,"CMU":0.7,"OSU":44.6,"TEX":28.4,"PSU":29.2,"NEV":-0.9,"CLEM":19.7,"LSU":22.9,"UGA":35,"MRSH":3.3,"ORE":41.9,"FSU":24.5,"ALA":33.5,"ASU":19.8,"MICH":29.2,"UNM":14.1,"FLA":21.1,"SMU":22.1,"OU":31.8,"TA&M":33.1,"UTSA":13.6,"IU":49,"ODU":15.1,"MISS":32.2,"GAST":-11,"TENN":25.6,"SYR":-0.2,"USM":1.8,"MSST":17.1,"MD":12.1,"FAU":-1.5,"PUR":9.9,"BALL":-10.3,"TULN":16.9,"NU":17.6,"PITT":21.3,"NAVY":12.3,"UK":16.1,"TOL":18.3,"BC":3.2,"WVU":7.5,"CONN":8.2,"LOU":21.3,"AFA":5.1,"MASS":-25.3,"TEM":3.7,"NIU":-4.7,"LIB":0.5,"ARK":18.9,"MEM":17,"IOWA":32.8,"UVA":21.6,"CCU":-6.3,"JMU":23.5,"VAN":33.2,"MTSU":-6,"ARST":-1.2,"USA":-2.6,"TROY":2.7,"USC":33.6,"MOST":0.3,"LT":6.9,"USU":11.8,"UTEP":-7.5,"BYU":31.3,"UL":-1.8,"RICE":-6.2,"TXST":7.5,"EMU":-5.3,"UNT":24.4,"TLSA":-1.5,"NMSU":-5.1,"GASO":-2.7,"WSU":16,"ORST":-1.8,"CAL":7.4,"ARIZ":26.6,"UCLA":10.9,"UTAH":37.1,"WASH":29.8,"CSU":-0.9,"MIA":35.9,"ND":41.6,"SC":19.8,"VT":8,"UNC":2.7,"TCU":19.7,"TTU":43.9,"KENT":-7.6};
+/* Fitted TOTALS model (logistic regression, 21 live-computable features, L2), trained on
+   2023-25 with real closing totals. Leave-one-season-out: college at >=58% confidence hit
+   62.9% / 65.2% / 55.4% (n=334); NFL 55.0% / 56.5% / 52.4% (n=212). Side models were
+   tested the same way and FAILED (worse than a coin flip) — so only totals are modelled. */
+const LOGIT_TOTALS={"nfl":{"keys":["a_lastU","a_lasttot","a_ostreak","a_pa","a_ppg","abs_spread","both_lastU","both_r","dog_imp","dogimp10","fcs","h_lastU","h_lasttot","h_ostreak","h_pa","h_ppg","hi60","lo45","neutral","total","wk"],"w":[-0.18241,0.04443,-0.08589,0.0662,-0.09342,-0.05264,0.26907,0.14311,0.0,-0.24339,0.0,0.0,0.0633,-0.03439,-0.05892,-0.00127,-0.02295,0.0,-0.09468,-0.05967,0.11552,0.15441]},"cfb":{"keys":["a_lastU","a_lasttot","a_ostreak","a_pa","a_ppg","abs_spread","both_lastU","both_r","dog_imp","dogimp10","fcs","h_lastU","h_lasttot","h_ostreak","h_pa","h_ppg","hi60","lo45","neutral","total","wk"],"w":[0.04738,-0.06561,-0.02664,-0.19134,-0.08433,-0.09937,0.0215,0.0419,-0.09117,-0.01441,0.07681,-0.04925,0.10321,0.04707,0.08315,-0.00713,-0.04866,-0.08349,-0.09198,-0.07558,-0.09894,0.03953]}};
+const MODEL_STRONG=0.58, MODEL_LEAN=0.55;
 const PRIOR_K=8;              // prior counts as 8 games of evidence
 const PRIOR_MAX_WEEKS=4;      // blend is used only while the season is this young
 const MIN_RATED_GAMES=3;      // a team needs this many results before it gets a rating
@@ -845,6 +852,7 @@ const BACKTEST_2025={
   bothunder: {n:197,pct:58.4,note:"both teams' last game went UNDER -> OVER. 2023 54.9%, 2024 58.6%, 2025 63.2%. Three-for-three; live"},
   fav10:     {n:73, pct:56.2,note:"favorites of 10+ COVERED — 2023 52.2%, 2024 57.9%, 2025 58.1%. Above break-even every season; thin, so a lean"},
   smallfav:  {n:229,pct:54.6,note:"favorites of 0.5 to 2.5 COVERED — 2023 56.9%, 2024 55.4%, 2025 51.4%. Modest lean"},
+  mtotal:    {n:212,pct:54.7,note:"FITTED TOTALS MODEL at >=58% confidence — 55.0% / 56.5% / 52.4% out-of-sample. Weaker than college; lean only"},
   keycross:  {n:69, pct:58.0,note:"line crossed 3 or 7 toward the favorite from open -> DOG. 58% in 2024 and 2025, no 2023 sample. Lean"},
   steam:     {n:512,pct:50.0,note:"following a spread or total move — nothing, three seasons. Held at lean"},
   pace:      {n:122,pct:54.1,note:"OUR totals model vs the closing total, 8+ pt gap: 50% / 56% / 56%. Barely above break-even — lean only"},
@@ -870,6 +878,7 @@ const BACKTEST_2025={
   rank28:    {n:100,pct:53.0,note:"ranked laying 28+ vs unranked FBS -> dog. 51.4% / 42.9% / 62.2%. One good year. Lean at most"},
   rank28fcs: {n:34, pct:50.0,note:"same spot vs FCS -> coin flip. Note only"},
   priorblend:{n:199,pct:59.0,note:"weeks 1-4: last season's ratings blended with this season's vs the closer, 3-6 pt gap. 52% / 69% / 58%. Lean with a good prior"},
+  mtotal:    {n:334,pct:59.6,note:"FITTED TOTALS MODEL at >=58% confidence — 62.9% / 65.2% / 55.4% out-of-sample (train two seasons, test the third). The board's best-validated call"},
   steamunr:  {n:211,pct:55.5,note:"line moved 1+ pt AGAINST a ranked team from open -> unranked side covers. 58% / 58% / 53%. Three-for-three. Following line moves in general does nothing — this one does"},
   steam:     {n:2030,pct:50.0,note:"following a total or spread move (any size) — no edge in three seasons of open-to-close data. Held at lean; a move is context, not a call"},
   pace:      {n:480,pct:49.6,note:"OUR totals model (offense/defense ratings) vs the closing total, 8+ pt gap: 54% / 40% / 53%. The market's totals beat ours in college — held at lean"},
@@ -915,9 +924,11 @@ function catProb(cat,lg){
   if(prior) return {p:prior.pct,src:"backtest"};
   return {p:DEFAULT_PROB_BY_WEIGHT[SIGNAL_WEIGHT[cat]||1],src:"prior"};
 }
-function playProb(cats,lg){
+function playProb(cats,lg,g){
   const list=[...new Set(cats)].filter(c=>c!=="stack"&&c!=="conflict").map(c=>catProb(c,lg));
   if(!list.length) return null;
+  // the fitted model carries its own calibrated probability for this exact game
+  if(g&&g.mtotalP&&cats.includes("mtotal")) list.push({p:Math.min(PROB_CAP,g.mtotalP),src:"model"});
   list.sort((a,b)=>b.p-a.p);
   // the strongest signal sets the base; each extra agreeing signal adds HALF its
   // own margin over break-even (they are not fully independent), capped hard
@@ -959,11 +970,33 @@ function blendedRating(g,t){
   const P=(state.power||{})[t.ab]; const n=P?P.n:gamesPlayed(t.ab); const cur=P?P.rating:null;
   return cur==null?prior:(n*cur+PRIOR_K*prior)/(n+PRIOR_K);
 }
+/* Feature builder — MUST mirror feats_total() in fit_logit.py exactly (same scaling, same defaults). */
+function modelTotalProb(g){
+  const M=LOGIT_TOTALS[g.lg]; if(!M||g.total==null||g.spread==null) return null;
+  const d=state.detail[g.id]||{}; const form=d.form||{}; const h=form[g.home.ab]||{}, a=form[g.away.ab]||{};
+  const tot=g.total, sp=g.spread; const homeImp=(tot-sp)/2, awayImp=tot-homeImp;
+  const rk=r=>typeof r==="number"&&r>=1&&r<=25;
+  const streak3=t=>Array.isArray(t.ouLast3)&&t.ouLast3.length>=3&&t.ouLast3.every(x=>x==="O");
+  const wk=state.wk[g.lg]||seasonWeekOf(g);
+  const f={
+    total:(tot-50)/10, abs_spread:Math.abs(sp)/10, hi60:tot>=60?1:0, lo45:tot<=45?1:0,
+    dog_imp:(Math.min(homeImp,awayImp)-15)/10, dogimp10:Math.min(homeImp,awayImp)<=10?1:0,
+    both_r:(rk(g.home.rank)&&rk(g.away.rank))?1:0,
+    h_ppg:((h.pfAll??26)-26)/10, a_ppg:((a.pfAll??26)-26)/10, h_pa:((h.paAll??26)-26)/10, a_pa:((a.paAll??26)-26)/10,
+    h_lastU:h.lastOU==="U"?1:0, a_lastU:a.lastOU==="U"?1:0,
+    h_lasttot:((h.lastTot??50)-50)/15, a_lasttot:((a.lastTot??50)-50)/15,
+    h_ostreak:streak3(h)?1:0, a_ostreak:streak3(a)?1:0,
+    wk:wk/10, fcs:(g.lg==="cfb"&&((g.home.conf!=null&&!isFBS(g.home))||(g.away.conf!=null&&!isFBS(g.away))))?1:0, neutral:g.neutral?1:0
+  };
+  f.both_lastU=f.h_lastU*f.a_lastU;
+  let z=M.w[0]; M.keys.forEach((k,i)=>{ z+=M.w[i+1]*(f[k]??0); });
+  return 1/(1+Math.exp(-z));
+}
 function bestPlayRaw(g){
   const E=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
   const byDir={}; E.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
   let best=null;
-  Object.entries(byDir).forEach(([dir,list])=>{ const cats=[...new Set(list.map(e=>e.cat))]; const pr=playProb(cats,g.lg); if(pr&&(!best||pr.p>best.p)) best={dir,cats,p:pr.p}; });
+  Object.entries(byDir).forEach(([dir,list])=>{ const cats=[...new Set(list.map(e=>e.cat))]; const pr=playProb(cats,g.lg,g); if(pr&&(!best||pr.p>best.p)) best={dir,cats,p:pr.p}; });
   return best;
 }
 function bestPlay(g){
@@ -972,7 +1005,7 @@ function bestPlay(g){
   let best=null;
   Object.entries(byDir).forEach(([dir,list])=>{
     const cats=[...new Set(list.map(e=>e.cat))];
-    const pr=playProb(cats,g.lg); if(!pr) return;
+    const pr=playProb(cats,g.lg,g); if(!pr) return;
     if(!best||pr.p>best.p) best={dir,cats,p:pr.p,src:pr.src,lead:list[0],stake:kellyStake(pr.p,-110)};
   });
   if(best&&betCut.size&&!betCut.has(`${g.id}|${best.dir}`)){ best.cut=true; best.stake={f:0,pct:0,dollars:0,capped:false,cut:true}; }
@@ -1024,7 +1057,7 @@ function callBox(g){
 }
 function bestChip(b){
   if(!b) return "";
-  const src=b.src==="live"?"from this board's own record":b.src==="backtest"?"2025 backtest":"default prior";
+  const src=b.src==="live"?"from this board's own record":b.src==="model"?"fitted model":b.src==="backtest"?"2023-25 backtest":"default prior";
   return `<div class="bestchip${b.p>=BEST_MIN_PROB?" good":""}"><b>${b.p}%</b> est. · ${b.stake.dollars>0?`¼-Kelly <b>$${b.stake.dollars}</b> (${b.stake.pct}% of $${state.bankroll})`:"no stake — under break-even"} <span class="src">${src}</span></div>`;
 }
 /* ================= ALERTS =================
@@ -1520,6 +1553,20 @@ function edgesForRaw(g){
     if(inSeason&&f.of>=MIN_FORM_GAMES&&f.streakLen>=3&&f.streakType==="L") E.push({k:"lean",dir:null,cat:"coldstreak",play:`${t.ab} is cold (${f.streakLen}-game skid)`,why:`Lost ${f.streakLen} straight this season. Public bettors often keep backing a name brand through a slide — check whether the line has actually adjusted for it.`});
     if(inSeason&&f.of>=MIN_FORM_GAMES&&f.streakLen>=4&&f.streakType==="W") E.push({k:"lean",dir:null,cat:"hotstreak",play:`${t.ab} is hot (${f.streakLen}-game streak)`,why:`Won ${f.streakLen} straight this season. Momentum alone isn't an edge, but paired with a soft line it's worth a second look.`});
   });
+  // FITTED TOTALS MODEL — 21 features, leave-one-season-out validated (see LOGIT_TOTALS).
+  // College: >=58% confidence hit 62.9% / 65.2% / 55.4% -> strong. NFL: 55.0% / 56.5% / 52.4% -> lean.
+  if(g.state!=="in"&&(state.detail[g.id]||{}).got){
+    const pm=modelTotalProb(g);
+    if(pm!=null){
+      const conf=Math.max(pm,1-pm), dir=pm>=0.5?"OVER":"UNDER";
+      g.mtotalP=Math.round(conf*1000)/10;
+      if(conf>=MODEL_LEAN){
+        const strong=conf>=MODEL_STRONG&&g.lg==="cfb";
+        E.push({k:strong?"strong":"lean",dir,cat:"mtotal",play:`${strong?"":"Lean "}${dir} ${total} — model ${Math.round(conf*100)}%`,
+          why:`The fitted totals model puts this at <b>${Math.round(conf*100)}%</b> to go ${dir}. It weighs the number itself, both teams' scoring and points allowed this season, their last game's total and whether it went over or under, over-streaks, the dog's implied points, rankings, week, and neutral/FCS context — 21 inputs fitted on 2023-25 with real closing totals. Tested by training on two seasons and predicting the third: at this confidence ${g.lg==="cfb"?(conf>=MODEL_STRONG?"college totals hit <b>62.9% / 65.2% / 55.4%</b> (n=334)":"college totals hit only 52.6% — a lean, nothing more"):(conf>=MODEL_STRONG?"NFL totals hit 55.0% / 56.5% / 52.4% (n=212) — a lean; the NFL version is weaker":"NFL totals hit 51.6% / 52.6% / 64.5% — inconsistent, lean only")}. Side models were tested the same way and failed, so there is no model call on spreads.`});
+      }
+    }
+  }
   // THREE-FOR-THREE (2023-25): both teams' last game went UNDER -> this total goes OVER.
   // NFL 58.4% (55% / 59% / 63%, n=197); college 53.6% (lean). Totals over-correct after
   // two quiet games. Needs each team's last closing total (fetched + cached above).
@@ -1908,7 +1955,7 @@ function topPlays(limit){
     Object.entries(byDir).forEach(([dir,list])=>{
       // support = distinct signal categories agreeing on this exact direction
       const cats=[...new Set(list.map(e=>e.cat))];
-      const pr=playProb(cats,g.lg)||{p:0,src:"prior"};
+      const pr=playProb(cats,g.lg,g)||{p:0,src:"prior"};
       const inCut=betCut.has(`${g.id}|${dir}`);
       rows.push({g,dir,cats,support:cats.length,lead:list[0],p:pr.p,src:pr.src,stake:inCut?kellyStake(pr.p,-110):{f:0,pct:0,dollars:0,capped:false,cut:true},
         kick:new Date(g.date)});
@@ -1926,7 +1973,7 @@ function renderTop(){
     state.games.filter(g=>g.state!=="post").forEach(g=>{
       const E=edgesFor(g).filter(e=>e.dir&&!e.stacked&&!e.conflict); const byDir={};
       E.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
-      Object.entries(byDir).forEach(([dir,list])=>{ const cats=[...new Set(list.map(e=>e.cat))]; const pr=playProb(cats,g.lg); if(pr) leans.push({g,dir,cats,p:pr.p,lead:list[0]}); });
+      Object.entries(byDir).forEach(([dir,list])=>{ const cats=[...new Set(list.map(e=>e.cat))]; const pr=playProb(cats,g.lg,g); if(pr) leans.push({g,dir,cats,p:pr.p,lead:list[0]}); });
     });
     leans.sort((a,b)=>b.p-a.p||b.cats.length-a.cats.length);
     box.innerHTML=`<div class="note"><b>No strong plays right now — so no bets.</b> Nothing on the slate clears the bar (hard evidence, or measured signals agreeing). That's the honest answer; it changes as weather firms up, injury reports land and lines move. Below is the <b>watch list</b>: the best leans, ranked by estimated hit rate. <b>These are not stakes.</b></div>
@@ -2251,6 +2298,7 @@ function renderTrackRecord(){
     <br><br><b>Looked great for one season, died in another — removed:</b> ranked laying 28+ → dog (51% / 43% / 62%) · team held to ≤7 last game · fade the rested college team · NFL primetime dog (37% in 2024) · CFB total ≤45 UNDER (38% in 2024) · NFL 4pm-window OVER (48% in 2023) · Sunday-night UNDER (50% in 2025) · our <b>college</b> power ratings (49% / 48% / 55%).
     <br><br><b>Line-movement findings (true opening vs closing lines, 2023-25, 2,542 games):</b> following or fading moves does nothing in either league — except one: in college, a line moving 1+ point <i>against a ranked team</i> means the unranked side covers (58% / 58% / 53%, n=211), now live. The bigger finding is <b>timing</b>: on 60+ totals the market itself moves the total down by kickoff 57% of the time, so that play is worth more early in the week; NFL favorites of 10+ gain ~2 points by close (bet early); NFL dogs at +7 to +9.5 see the number move <i>against</i> them 82% of the time (wait). Each call now carries a ⏱ timing note.
     <br><br><b>Box-score findings (yards per play, turnovers, third downs for every game, 2023-25):</b> nothing beats the market. An opponent-adjusted yards-per-play rating projects the closer at 49-51% in both leagues — the books already price efficiency. "Turnover-luck regression" is backwards: betting turnover-unlucky college teams went <b>44%</b> three years running (bad teams turn it over because they're bad). Third-down fades and "out-gaining but losing" spots were coin flips. None of it is on the board, and that's the point of testing before shipping.
+    <br><br><b>Fitted models:</b> a 21-input logistic model for totals, trained on two seasons and tested on the third (all three rotations), is the best-validated thing on the board: college totals at ≥58% confidence hit <b>62.9% / 65.2% / 55.4%</b> (n=334) and are calibrated (games it calls 55-60% land at 56%); the NFL version is weaker (55% / 57% / 52%) and stays a lean. The same procedure on <b>sides</b> failed in both leagues — worse than a coin flip in college — so there is deliberately no model call on spreads.
     <br><br><b>Model findings:</b> our NFL power ratings beat the closer from week 10 in all three seasons and every attempt to add prior-season strength made them <i>worse</i> (blending toward the market removes the edge). College is the reverse: current-season ratings never beat the closer, but last season's ratings blended in for weeks 1-4 went 52% / 69% / 58% — now live as a lean. Our totals models (offense/defense ratings, simple averages, market blends) do <b>not</b> beat closing totals in either league, so total projections are shown as context and never as a call.
     <br><br><b>Negative all three years:</b> college home dogs in the final two weeks of the regular season (40% / 38% / 38%). <b>Dead folklore, three years:</b> home dogs, always-over, divisional unders, revenge games, letdown/bounce-back spots, rest in either direction.</div>
     <div class="sech" style="margin-top:22px">Signal priors <span class="cnt">2023–2025 · 3,371 real games, closing lines</span></div>
@@ -2287,7 +2335,7 @@ function parlayLegs(){
       if(seen.has(id)) return; seen.add(id);
       const odds = type==="total" ? (e.dir==="OVER"?(d.overOdds??-110):(d.underOdds??-110)) : (d.spreadOdds??-110);
       const cats=[...new Set(edgesFor(g).filter(x=>x.k==="strong"&&x.dir===e.dir&&!x.stacked).map(x=>x.cat))];
-      const pr=playProb(cats,g.lg); const p=pr?pr.p:52.4;
+      const pr=playProb(cats,g.lg,g); const p=pr?pr.p:52.4;
       legs.push({id,gameId:g.id,name:g.name,play:e.play,odds:Math.round(odds),p,cats});
     });
   });
