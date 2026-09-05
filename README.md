@@ -47,8 +47,13 @@ season. Only three-for-three signals can make a strong call on their own.
 A second wall used true opening/closing lines (line-movement rules: nothing except a move against a ranked team, 58/58/53%) and full box scores (yards per play, turnovers, third downs: nothing — the market prices efficiency; turnover-luck "regression" is a stable loser at 44%). Closing-line-value per spot drives a bet-timing note on every call.
 
 117 rule×league tests were run ("the wall"); every result, including the failures, is
-shown in the app's Results → Advanced section. Weather signals cannot be backtested
-(ESPN strips forecasts from finished games) and can never make a strong call alone.
+shown in the app's Results → Advanced section. Weather was backtested on real kickoff conditions (Open-Meteo archive, 3,040 outdoor
+games): NFL 20+ mph gusts → UNDER 57.9% but 71/43/61% by season; college wind 50%;
+rain over in college, cold over in the NFL. Weather is lean-only with measured weights.
+
+A fitted 21-feature logistic **totals** model (leave-one-season-out: college ≥58% confidence
+62.9/65.2/55.4%, NFL 55/56.5/52.4%) is the best-validated call on the board; side models
+failed and are not shipped.
 
 ## Architecture
 

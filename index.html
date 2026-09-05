@@ -854,6 +854,9 @@ const BACKTEST_2025={
   smallfav:  {n:229,pct:54.6,note:"favorites of 0.5 to 2.5 COVERED — 2023 56.9%, 2024 55.4%, 2025 51.4%. Modest lean"},
   mtotal:    {n:212,pct:54.7,note:"FITTED TOTALS MODEL at >=58% confidence — 55.0% / 56.5% / 52.4% out-of-sample. Weaker than college; lean only"},
   keycross:  {n:69, pct:58.0,note:"line crossed 3 or 7 toward the favorite from open -> DOG. 58% in 2024 and 2025, no 2023 sample. Lean"},
+  wind:      {n:202,pct:57.9,note:"WEATHER, FINALLY MEASURED (real kickoff conditions, outdoor games): gusts 20+ -> UNDER 57.9% pooled but 71% / 43% / 61% by season — real on average, wildly volatile. Never strong alone"},
+  precip:    {n:51, pct:62.7,note:"rain (1mm+ during the game) -> UNDER 62.7% — but 78% / 50% / 50%; thin and front-loaded. Lean"},
+  cold:      {n:39, pct:43.6,note:"freezing (<=32F) -> UNDER went 43.6% — cold does NOT mean under in the NFL. Held at lean, weight cut"},
   steam:     {n:512,pct:50.0,note:"following a spread or total move — nothing, three seasons. Held at lean"},
   pace:      {n:122,pct:54.1,note:"OUR totals model vs the closing total, 8+ pt gap: 50% / 56% / 56%. Barely above break-even — lean only"},
   lowlast:   {n:200,pct:54.5,note:"either team's last game <=30 combined -> OVER. 2023 48.8%, 2024 57.1%, 2025 59.4%. Failed 2023, so a lean"},
@@ -878,6 +881,10 @@ const BACKTEST_2025={
   rank28:    {n:100,pct:53.0,note:"ranked laying 28+ vs unranked FBS -> dog. 51.4% / 42.9% / 62.2%. One good year. Lean at most"},
   rank28fcs: {n:34, pct:50.0,note:"same spot vs FCS -> coin flip. Note only"},
   priorblend:{n:199,pct:59.0,note:"weeks 1-4: last season's ratings blended with this season's vs the closer, 3-6 pt gap. 52% / 69% / 58%. Lean with a good prior"},
+  wind:      {n:678,pct:50.4,note:"WEATHER, FINALLY MEASURED: gusts 20+ -> UNDER 50.4% in college (56% / 46% / 50%). Wind does not beat closing totals in college; 25+ gusts 52.3%. Held at lean, weight cut"},
+  precip:    {n:116,pct:44.0,note:"rain (1mm+) -> UNDER went 44% in college (41% / 49% / 42%) — if anything rain games went OVER. Weight cut"},
+  heat:      {n:82, pct:58.5,note:"90F+ at kickoff -> UNDER 58.5% (68% / 58% / 42%) — faded in 2025. Lean"},
+  cold:      {n:32, pct:56.2,note:"freezing -> UNDER 56% on a thin college sample (80% / 53% / 50%)"},
   mtotal:    {n:334,pct:59.6,note:"FITTED TOTALS MODEL at >=58% confidence — 62.9% / 65.2% / 55.4% out-of-sample (train two seasons, test the third). The board's best-validated call"},
   steamunr:  {n:211,pct:55.5,note:"line moved 1+ pt AGAINST a ranked team from open -> unranked side covers. 58% / 58% / 53%. Three-for-three. Following line moves in general does nothing — this one does"},
   steam:     {n:2030,pct:50.0,note:"following a total or spread move (any size) — no edge in three seasons of open-to-close data. Held at lean; a move is context, not a call"},
@@ -1499,10 +1506,10 @@ function edgesForRaw(g){
   if(!indoor){
     // WIND — the strongest, best-documented weather effect on scoring
     if(gust!=null){
-      // Strong needs 25+ mph GUSTS (was 20 — one forecast number was making a strong
-      // call on its own). Honest caveat carried in the copy: weather cannot be
-      // backtested from ESPN's data, so this weight is hand-set, not measured.
-      if(gust>=25) E.push({k:"strong",dir:"UNDER",cat:"wind",play:`UNDER ${total??""} — wind`,why:`Gusts to ${gust} mph forecast. Deep passing and field goals fall off sharply in wind like this; it's the best-documented weather effect in football. Also fades the kicker and both QBs' passing props. <b>Caveat:</b> this is a forecast, and the wind rule is the one signal here that could NOT be backtested — its weight is hand-set, not measured. Check the wind again right before kickoff.`});
+      // Strong needs 25+ mph GUSTS and a second, non-weather signal. Measured on real
+      // kickoff conditions 2023-25 (Open-Meteo archive): NFL 20+ gusts UNDER 57.9%
+      // (71/43/61 by season), college 50.4%. The market already prices wind.
+      if(gust>=25) E.push({k:"strong",dir:"UNDER",cat:"wind",play:`UNDER ${total??""} — wind`,why:`Gusts to ${gust} mph forecast. Deep passing and field goals fall off sharply in wind like this; it's the best-documented weather effect in football. Also fades the kicker and both QBs' passing props. <b>Measured at last</b> (real kickoff conditions, 3 seasons): 20+ mph gusts went UNDER <b>57.9%</b> in the NFL — but 71% / 43% / 61% by season — and only <b>50.4%</b> in college. The market prices wind better than folklore says; that's why wind alone can never make a strong call here. Check the forecast again right before kickoff.`});
       else if(gust>=15) E.push({k:"lean",dir:"UNDER",cat:"wind",play:`Lean UNDER ${total??""} — wind`,why:`Gusts to ${gust} mph forecast. Enough to shorten the passing game and make long field goals dicey — a lean, not a play, until it's 25+.`});
     }
     // PRECIP
@@ -2304,6 +2311,7 @@ function renderTrackRecord(){
     <br><br><b>Two out of three — leans with a prior, never a call alone:</b> ranked vs ranked UNDER (51% / 56% / 62%) · unranked laying 21+ vs FCS → favorite (<b>43%</b> / 58% / 59%) · NFL dog +7 to +9.5 (49% / 66% / 58%) · either team's last game ≤30 → OVER · NFL small favorites (57% / 55% / 51%).
     <br><br><b>Looked great for one season, died in another — removed:</b> ranked laying 28+ → dog (51% / 43% / 62%) · team held to ≤7 last game · fade the rested college team · NFL primetime dog (37% in 2024) · CFB total ≤45 UNDER (38% in 2024) · NFL 4pm-window OVER (48% in 2023) · Sunday-night UNDER (50% in 2025) · our <b>college</b> power ratings (49% / 48% / 55%).
     <br><br><b>Line-movement findings (true opening vs closing lines, 2023-25, 2,542 games):</b> following or fading moves does nothing in either league — except one: in college, a line moving 1+ point <i>against a ranked team</i> means the unranked side covers (58% / 58% / 53%, n=211), now live. The bigger finding is <b>timing</b>: on 60+ totals the market itself moves the total down by kickoff 57% of the time, so that play is worth more early in the week; NFL favorites of 10+ gain ~2 points by close (bet early); NFL dogs at +7 to +9.5 see the number move <i>against</i> them 82% of the time (wait). Each call now carries a ⏱ timing note.
+    <br><br><b>Weather, finally measured</b> (real hourly conditions at kickoff for 3,040 outdoor games, via the Open-Meteo archive): nothing is three-for-three. NFL 20+ mph gusts → UNDER went 57.9% pooled but <b>71% / 43% / 61%</b> by season; college wind is a coin flip (50.4%); rain went under in the NFL (63%, thin) and <i>over</i> in college (56%); freezing NFL games went <b>over</b> (cold-under 43.6%); 90°F+ college games leaned under until 2025 (42%). The market prices weather better than the folklore says. Weather stays lean-only, with weights now set from these numbers instead of by hand.
     <br><br><b>Box-score findings (yards per play, turnovers, third downs for every game, 2023-25):</b> nothing beats the market. An opponent-adjusted yards-per-play rating projects the closer at 49-51% in both leagues — the books already price efficiency. "Turnover-luck regression" is backwards: betting turnover-unlucky college teams went <b>44%</b> three years running (bad teams turn it over because they're bad). Third-down fades and "out-gaining but losing" spots were coin flips. None of it is on the board, and that's the point of testing before shipping.
     <br><br><b>Fitted models:</b> a 21-input logistic model for totals, trained on two seasons and tested on the third (all three rotations), is the best-validated thing on the board: college totals at ≥58% confidence hit <b>62.9% / 65.2% / 55.4%</b> (n=334) and are calibrated (games it calls 55-60% land at 56%); the NFL version is weaker (55% / 57% / 52%) and stays a lean. The same procedure on <b>sides</b> failed in both leagues — worse than a coin flip in college — so there is deliberately no model call on spreads.
     <br><br><b>Model findings:</b> our NFL power ratings beat the closer from week 10 in all three seasons and every attempt to add prior-season strength made them <i>worse</i> (blending toward the market removes the edge). College is the reverse: current-season ratings never beat the closer, but last season's ratings blended in for weeks 1-4 went 52% / 69% / 58% — now live as a lean. Our totals models (offense/defense ratings, simple averages, market blends) do <b>not</b> beat closing totals in either league, so total projections are shown as context and never as a call.
