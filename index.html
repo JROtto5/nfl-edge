@@ -964,7 +964,7 @@ function rawKelly(p,odds){
 }
 function recomputeExposure(){
   const cands=[];
-  state.games.filter(g=>g.state!=="post").forEach(g=>{ const b=bestPlayRaw(g); if(b) cands.push({key:`${g.id}|${b.dir}`,p:b.p,n:b.cats.length,odds:priceFor(g,b.dir)}); });
+  state.games.filter(g=>g.state!=="post").forEach(g=>{ const b=bestPlayRaw(g); if(b&&!b.contested) cands.push({key:`${g.id}|${b.dir}`,p:b.p,n:b.cats.length,odds:priceFor(g,b.dir)}); });
   cands.sort((a,b)=>b.p-a.p||b.n-a.n);
   betCut=new Set(cands.slice(0,MAX_BETS).map(c=>c.key));
   let sum=0; cands.slice(0,MAX_BETS).forEach(c=>{ sum+=rawKelly(c.p,c.odds); });
@@ -1009,11 +1009,19 @@ function modelTotalProb(g){
   let z=M.w[0]; M.keys.forEach((k,i)=>{ z+=M.w[i+1]*(f[k]??0); });
   return 1/(1+Math.exp(-z));
 }
+/* Opposing signals on the same market (e.g. a 60+ UNDER against a garbage-time OVER):
+   that's a coin flip dressed as two plays. Count them so contested calls rank last
+   and never get a stake. */
+function againstCount(g,dir){   // weighted: an opposing STRONG signal counts double, so one is enough to contest
+  const isTot=dir==="OVER"||dir==="UNDER"; const seen=new Set(); let n=0;
+  edgesFor(g).filter(e=>e.dir&&e.dir!==dir&&!e.stacked&&!e.conflict&&((e.dir==="OVER"||e.dir==="UNDER")===isTot)).forEach(e=>{ if(seen.has(e.cat)) return; seen.add(e.cat); n+=e.k==="strong"?2:1; });
+  return n;
+}
 function bestPlayRaw(g){
   const E=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
   const byDir={}; E.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
   let best=null;
-  Object.entries(byDir).forEach(([dir,list])=>{ const cats=[...new Set(list.map(e=>e.cat))]; const pr=playProb(cats,g.lg,g); if(pr&&(!best||pr.p>best.p)) best={dir,cats,p:pr.p}; });
+  Object.entries(byDir).forEach(([dir,list])=>{ const cats=[...new Set(list.map(e=>e.cat))]; const pr=playProb(cats,g.lg,g); if(!pr) return; const contested=againstCount(g,dir)>=2; const score=pr.p-(contested?100:0); if(!best||score>best.score) best={dir,cats,p:pr.p,contested,score}; });
   return best;
 }
 /* The price actually on offer for a side/total, from ESPN's book data; -110 if unknown. */
@@ -1030,9 +1038,10 @@ function bestPlay(g){
   Object.entries(byDir).forEach(([dir,list])=>{
     const cats=[...new Set(list.map(e=>e.cat))];
     const pr=playProb(cats,g.lg,g); if(!pr) return;
-    if(!best||pr.p>best.p) best={dir,cats,p:pr.p,src:pr.src,lead:list[0],odds:priceFor(g,dir),stake:kellyStake(pr.p,priceFor(g,dir))};
+    const contested=againstCount(g,dir)>=2; const score=pr.p-(contested?100:0);
+    if(!best||score>best.score) best={dir,cats,p:pr.p,src:pr.src,lead:list[0],odds:priceFor(g,dir),stake:kellyStake(pr.p,priceFor(g,dir)),contested,score};
   });
-  if(best&&betCut.size&&!betCut.has(`${g.id}|${best.dir}`)){ best.cut=true; best.stake={f:0,pct:0,dollars:0,capped:false,cut:true}; }
+  if(best&&(best.contested||(betCut.size&&!betCut.has(`${g.id}|${best.dir}`)))){ best.cut=true; best.stake={f:0,pct:0,dollars:0,capped:false,cut:true}; }
   return best;
 }
 // Format the number a call is on: totals carry the total, sides carry THEIR spread.
@@ -1067,7 +1076,7 @@ function callBox(g){
   const b=bestPlay(g);
   if(b){
     const num=callNumber(g,b.dir,live);
-    const stake=b.cut?`no stake <span class="cb3">(strong, but outside this week's top ${MAX_BETS} by edge)</span>`:(b.stake.dollars>0?`$${b.stake.dollars} <span class="cb3">(${b.stake.pct}% of $${state.bankroll}, ¼-Kelly)</span>`:`no stake <span class="cb3">(est. under break-even)</span>`);
+    const stake=b.contested?`no stake <span class="cb3">(⚠ contested — other signals point the opposite way on this market)</span>`:b.cut?`no stake <span class="cb3">(strong, but outside this week's top ${MAX_BETS} by edge)</span>`:(b.stake.dollars>0?`$${b.stake.dollars} <span class="cb3">(${b.stake.pct}% of $${state.bankroll}, ¼-Kelly)</span>`:`no stake <span class="cb3">(est. under break-even)</span>`);
     return `<div class="callbox ${b.cut?"strongcut":"bet"}${live?" live":""}">
       <div class="cb1">${b.cut?"◆ STRONG":"▶ "+(live?"LIVE BET":"BET")}: ${num}</div>
       <div class="cb2"><b>${stake}</b> · <b>${b.p}%</b> est. hit rate${b.odds!=null&&b.odds!==-110?` · at <b>${b.odds>0?"+":""}${b.odds}</b>`:""}</div>
@@ -1153,6 +1162,7 @@ async function teamNews(lg,teamId){
   }catch(e){ return []; }
 }
 document.getElementById("board").addEventListener("click",e=>{
+  const nv=e.target.closest("button[data-view]"); if(nv){ setView(nv.dataset.view); return; }
   const bb=e.target.closest(".betbtn[data-bet]");
   if(bb){ const [gid,dir]=bb.dataset.bet.split("|"); const g=state.games.find(x=>x.id===gid); if(!g) return; if(onTicket(g,dir)) removeFromTicket(ticketKey(g,dir)); else addToTicket(g,dir); render(); return; }
   const tm=e.target.closest(".tm[data-team]"); if(!tm) return;
@@ -1237,7 +1247,7 @@ function renderTicket(){
       <div class="tk"><div class="tn">$${risk}</div><div class="tl">Open risk</div></div></div>
     <div class="note">Tap <b>Bet this</b> on any call to put it here. The line and price freeze at that moment; each item shows live covering/trailing, grades itself at final with real P&amp;L, and fires a <b>SWEAT</b> alert when it's inside a touchdown in the 4th. Device-only — your ticket is nobody's business.</div>
     ${watch.length?`<div class="sech">🔥 Games to watch <span class="cnt">${watch.length} close late</span></div>${watch.map(x=>`<div class="trow watchrow"><span class="rbadge ${x.st.ok?"win":"loss"} live">${x.st.ok?"covering":"trailing"} by ${x.dist}</span><div class="tbody"><div class="tplay">${x.r.playText||x.r.label}</div><div class="tsub">${x.st.txt}</div></div></div>`).join("")}`:""}
-    ${open.length?`<div class="sech">Open <span class="cnt">${open.length}</span></div>${open.map(row).join("")}`:'<div class="empty">Nothing on the ticket. Tap <b>Bet this</b> on a call.</div>'}
+    ${open.length?`<div class="sech">Open <span class="cnt">${open.length}</span></div>${open.map(row).join("")}`:'<div class="empty">Nothing on the ticket yet.<br><br><button class="tbtn" data-view="top">★ Go to Top Plays</button></div>'}
     ${settled.length?`<div class="sech" style="margin-top:18px">Settled <span class="cnt">${settled.length}</span></div>${settled.slice().reverse().map(row).join("")}`:""}
     ${t.length?`<div class="prow"><button class="tbtn" id="tkClearSettled">Clear settled</button></div>`:""}`;
   box.querySelectorAll(".tkstake").forEach(el=>el.addEventListener("change",e=>{ const tt=ticket(); const it=tt.find(x=>x.key===e.target.dataset.key); if(it){ it.stake=Math.max(1,Number(e.target.value)||1); saveTicket(tt); renderTicket(); } }));
@@ -2069,12 +2079,12 @@ function topPlays(limit){
       // support = distinct signal categories agreeing on this exact direction
       const cats=[...new Set(list.map(e=>e.cat))];
       const pr=playProb(cats,g.lg,g)||{p:0,src:"prior"};
-      const inCut=betCut.has(`${g.id}|${dir}`);
-      rows.push({g,dir,cats,support:cats.length,lead:list[0],p:pr.p,src:pr.src,odds:priceFor(g,dir),stake:inCut?kellyStake(pr.p,priceFor(g,dir)):{f:0,pct:0,dollars:0,capped:false,cut:true},
+      const contested=againstCount(g,dir)>=2; const inCut=!contested&&betCut.has(`${g.id}|${dir}`);
+      rows.push({g,dir,cats,support:cats.length,lead:list[0],p:pr.p,src:pr.src,contested,odds:priceFor(g,dir),stake:inCut?kellyStake(pr.p,priceFor(g,dir)):{f:0,pct:0,dollars:0,capped:false,cut:true},
         kick:new Date(g.date)});
     });
   });
-  rows.sort((a,b)=>b.p-a.p || b.support-a.support || a.kick-b.kick);
+  rows.sort((a,b)=>(a.contested?1:0)-(b.contested?1:0) || b.p-a.p || b.support-a.support || a.kick-b.kick);
   return limit?rows.slice(0,limit):rows;
 }
 function renderTop(){
@@ -2094,7 +2104,7 @@ function renderTop(){
         <div class="topplay">◦ WATCH: ${callNumber(r.g,r.dir,r.g.state==="in")}</div>
         <div class="topgame">${r.g.name} · ${fmtTime(r.g.date)} · ${r.lead.play}</div>
         <div class="topcats">${r.cats.map(c=>`<span class="catchip">${c}</span>`).join("")}</div></div>
-        <div class="topsupport"><button class="tbtn betbtn${onTicket(r.g,r.dir)?" on":""}" data-bet="${r.g.id}|${r.dir}" style="margin-bottom:4px">${onTicket(r.g,r.dir)?"✓":"Bet"}</button><div class="tsn">${r.p}%</div><div class="tsl">no stake</div></div></div>`).join("")||'<div class="empty">Nothing leaning either — the slate looks priced fairly.</div>'}`;
+        <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">no stake</div></div></div>`).join("")||'<div class="empty">Nothing leaning either — the slate looks priced fairly.</div>'}`;
     updateLive(); return;
   }
   const ex=recomputeExposure();
@@ -2105,11 +2115,11 @@ function renderTop(){
     ${rows.map((r,i)=>`<div class="toprow">
       <div class="topnum">${i+1}</div>
       <div class="topbody">
-        <div class="topplay">${r.g.away.logo?`<img class="tlogo" src="${r.g.away.logo}" alt="">`:""}${r.g.home.logo?`<img class="tlogo" src="${r.g.home.logo}" alt="">`:""} ▶ ${r.g.state==="in"?"LIVE BET":"BET"}: ${callNumber(r.g,r.dir,r.g.state==="in")}</div>
+        <div class="topplay">${r.g.away.logo?`<img class="tlogo" src="${r.g.away.logo}" alt="">`:""}${r.g.home.logo?`<img class="tlogo" src="${r.g.home.logo}" alt="">`:""} ${r.contested?"⚠ CONTESTED":"▶ "+(r.g.state==="in"?"LIVE BET":"BET")}: ${callNumber(r.g,r.dir,r.g.state==="in")}</div>
         <div class="topgame">${r.g.name} · ${r.g.state==="in"?`LIVE ${r.g.away.score}–${r.g.home.score} ${r.g.short}`:fmtTime(r.g.date)} · because: ${r.lead.play}</div>
         <div class="topcats">${r.cats.map(c=>`<span class="catchip">${c}</span>`).join("")} <span class="srcnote">${r.src==="live"?"own record":r.src==="model"?"fitted model":r.src==="backtest"?"2023-25 backtest":"default prior"}</span></div>
       </div>
-      <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">${betCut.has(`${r.g.id}|${r.dir}`)?(r.stake.dollars>0?`¼-Kelly $${r.stake.dollars}${r.odds!==-110?` @${r.odds>0?"+":""}${r.odds}`:""}`:"no stake"):"below the cut"}</div><div class="tsl">${r.support} signal${r.support===1?"":"s"}</div></div>
+      <div class="topsupport"><button class="tbtn betbtn${onTicket(r.g,r.dir)?" on":""}" data-bet="${r.g.id}|${r.dir}" style="margin-bottom:4px">${onTicket(r.g,r.dir)?"✓ ticket":"Bet"}</button><div class="tsn">${r.p}%</div><div class="tsl">${r.contested?"contested · no stake":betCut.has(`${r.g.id}|${r.dir}`)?(r.stake.dollars>0?`¼-Kelly $${r.stake.dollars}${r.odds!==-110?` @${r.odds>0?"+":""}${r.odds}`:""}`:"no stake"):"below the cut"}</div><div class="tsl">${r.support} signal${r.support===1?"":"s"}</div></div>
     </div>`).join("")}`;
   document.getElementById("bankrollInput")?.addEventListener("change",e=>{ state.bankroll=Math.max(0,Number(e.target.value)||0); lsSet("edgeboard-bankroll",state.bankroll); renderTop(); });
   updateLive();
@@ -2590,7 +2600,7 @@ function card(g){
     </div>
     ${callBox(g)}
     <div class="lines">
-      <div class="ln"><div class="l">Spread${d.openSpread!=null&&g.spread!=null&&d.openSpread!==g.spread?` <span class="opn">opened ${d.openSpread>0?"+":""}${d.openSpread}</span>`:""}</div><div class="v">${g.details||(live&&d.liveDetails?`<span class="lv">LIVE ${d.liveDetails}</span>`:"—")}${moveTag(g.moveSpread,"")}</div></div>
+      <div class="ln"><div class="l">Spread${d.openSpread!=null&&g.spread!=null&&d.openSpread!==g.spread?` <span class="opn">opened ${d.openSpread>0?"+":""}${d.openSpread}</span>`:""}</div><div class="v">${g.details||(live?(d.liveDetails?`<span class="lv">LIVE ${d.liveDetails}</span>`:`<span class="dim" style="font-size:10px">live line suspended</span>`):"—")}${moveTag(g.moveSpread,"")}</div></div>
       <div class="ln"><div class="l">Total${d.openTotal!=null&&g.total!=null&&d.openTotal!==g.total?` <span class="opn">opened ${d.openTotal}</span>`:""}</div><div class="v">${g.total??(live&&d.liveTotal!=null?`<span class="lv">LIVE ${d.liveTotal}</span>`:"—")}${moveTag(g.moveTotal,"")}</div></div>
       <div class="ln"><div class="l">ML ${g.away.ab}/${g.home.ab}</div><div class="v" style="font-size:11.5px">${ml(g.mlAway)} / ${ml(g.mlHome)}</div></div>
     </div>
@@ -2724,13 +2734,14 @@ function startPolling(){
   pollB=setInterval(queueDetails,300000);  // weather + injuries every 5 min
 }
 function stopPolling(){ clearInterval(pollA); clearInterval(pollB); }
+const STATIC_QA=(typeof location!=="undefined"&&/static=1/.test(location.search||""));   // ?static=1: no polling (screenshots/QA)
 document.addEventListener("visibilitychange",()=>{
   if(document.hidden) stopPolling();
-  else { loadSlate(); startPolling(); }
+  else { loadSlate(); if(!STATIC_QA) startPolling(); }
 });
 
 loadSlate();
-startPolling();
+if(!STATIC_QA) startPolling();
 })();
 </script>
 </body>
