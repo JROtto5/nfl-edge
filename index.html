@@ -157,6 +157,7 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .callbox.bet{border-color:var(--green)}
 .callbox.live{border-color:var(--amber)}
 .callbox.strongcut{border-color:var(--line);border-style:dashed}
+.timing.early{color:var(--green)} .timing.late{color:var(--amber)}
 .callbox.strongcut .cb1{font-size:15px}
 .callbox .cb1{font-size:18px;font-weight:800;letter-spacing:.01em;line-height:1.2}
 .callbox .cb2{font-size:13px;color:var(--dim)}
@@ -196,6 +197,7 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .more summary .dim{font-weight:400}
 .more>*+*{margin-top:8px}
 .lv{color:var(--amber);font-weight:700}
+.opn{text-transform:none;letter-spacing:0;font-size:9.5px;color:var(--amber)}
 .intro summary{cursor:pointer;list-style:none;font-size:14px}
 .intro summary::-webkit-details-marker{display:none}
 .intro summary::after{content:" ▸";color:var(--dim)}
@@ -389,7 +391,10 @@ function parseCoreOdds(items){
     if(it.spread==null&&it.overUnder==null) return;
     const k=isLive?"live":"pre";
     if(out[k]) return;                        // first of each kind wins (DraftKings first)
-    out[k]={spread:it.spread??null,total:it.overUnder??null,details:it.details||null};
+    const num=v=>{ if(v==null) return null; const t=String(v).replace("+",""); if(t==="EVEN") return 0; const n=parseFloat(t); return Number.isNaN(n)?null:n; };
+    out[k]={spread:it.spread??null,total:it.overUnder??null,details:it.details||null,
+      openSpread:num(it.homeTeamOdds?.open?.pointSpread?.alternateDisplayValue??it.homeTeamOdds?.open?.pointSpread?.american),
+      openTotal:num(it.open?.total?.alternateDisplayValue??it.open?.total?.american)};
   });
   return out;
 }
@@ -428,7 +433,7 @@ const SIGNAL_WEIGHT={
   matchup:1, rest:1, shortweek:1, shortprep:1, divisional:1, homedog:1,
   rank:1, newcoach:1, coachexp:1, primetime:1, keynumber:1, heat:1,
   domefade:1, neutral:1, chalk:1, ats:1, hotstreak:1, coldstreak:1, qbquestion:1,
-  rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1,
+  rankclash:1, hightotal:1, ratings:2, livespread:1, rank28:1, rank28fcs:1, steamunr:1, keycross:1,
   unrfavfcs:1, dogimp10:1, lowlast:1, dog7to9:1, bigfav:1, smallfav:1, external:1, bothunder:1, priorblend:1
 };
 const STACK_STRONG_AT=4;
@@ -634,7 +639,7 @@ async function runQueue(){
     const viaApi=API&&!apiDown;
     const batch=detailQueue.splice(0,viaApi?12:4);
     const sumUrl=g=>`${g.lg==="nfl"?NFL:CFB}/summary?event=${g.id}`;
-    const oddsUrl=g=>g.state==="in"?`${CORE}/${CORE_LG[g.lg]}/events/${g.id}/competitions/${g.id}/odds`:null;
+    const oddsUrl=g=>`${CORE}/${CORE_LG[g.lg]}/events/${g.id}/competitions/${g.id}/odds`;   // pregame: true opening line; live: the live line
     const want=[]; batch.forEach(g=>{ want.push(sumUrl(g)); if(oddsUrl(g)) want.push(oddsUrl(g)); });
     const got=await jgetMany(want);
     const byUrl=new Map(want.map((u,i)=>[u,got[i]]));
@@ -721,6 +726,7 @@ async function runQueue(){
           homeSpreadOdds:pc.homeTeamOdds?.spreadOdds??null, awaySpreadOdds:pc.awayTeamOdds?.spreadOdds??null,
           // pregame closer (scoreboard drops it at kickoff) and the live line, if any
           preSpread:co.pre?.spread??pc.spread??null, preTotal:co.pre?.total??pc.overUnder??null,
+          openSpread:co.pre?.openSpread??null, openTotal:co.pre?.openTotal??null,
           liveSpread:co.live?.spread??null, liveTotal:co.live?.total??null, liveDetails:co.live?.details??null};
       }catch(e){ state.detail[g.id]={got:true,err:true}; }
     }));
@@ -837,6 +843,8 @@ const BACKTEST_2025={
   bothunder: {n:197,pct:58.4,note:"both teams' last game went UNDER -> OVER. 2023 54.9%, 2024 58.6%, 2025 63.2%. Three-for-three; live"},
   fav10:     {n:73, pct:56.2,note:"favorites of 10+ COVERED — 2023 52.2%, 2024 57.9%, 2025 58.1%. Above break-even every season; thin, so a lean"},
   smallfav:  {n:229,pct:54.6,note:"favorites of 0.5 to 2.5 COVERED — 2023 56.9%, 2024 55.4%, 2025 51.4%. Modest lean"},
+  keycross:  {n:69, pct:58.0,note:"line crossed 3 or 7 toward the favorite from open -> DOG. 58% in 2024 and 2025, no 2023 sample. Lean"},
+  steam:     {n:512,pct:50.0,note:"following a spread or total move — nothing, three seasons. Held at lean"},
   pace:      {n:122,pct:54.1,note:"OUR totals model vs the closing total, 8+ pt gap: 50% / 56% / 56%. Barely above break-even — lean only"},
   lowlast:   {n:200,pct:54.5,note:"either team's last game <=30 combined -> OVER. 2023 48.8%, 2024 57.1%, 2025 59.4%. Failed 2023, so a lean"},
   dog7to9:   {n:120,pct:57.5,note:"dogs of +7 to +9.5 COVERED — 2023 48.6%, 2024 65.8%, 2025 57.8%. Two big years, one miss; lean only"},
@@ -860,6 +868,8 @@ const BACKTEST_2025={
   rank28:    {n:100,pct:53.0,note:"ranked laying 28+ vs unranked FBS -> dog. 51.4% / 42.9% / 62.2%. One good year. Lean at most"},
   rank28fcs: {n:34, pct:50.0,note:"same spot vs FCS -> coin flip. Note only"},
   priorblend:{n:199,pct:59.0,note:"weeks 1-4: last season's ratings blended with this season's vs the closer, 3-6 pt gap. 52% / 69% / 58%. Lean with a good prior"},
+  steamunr:  {n:211,pct:55.5,note:"line moved 1+ pt AGAINST a ranked team from open -> unranked side covers. 58% / 58% / 53%. Three-for-three. Following line moves in general does nothing — this one does"},
+  steam:     {n:2030,pct:50.0,note:"following a total or spread move (any size) — no edge in three seasons of open-to-close data. Held at lean; a move is context, not a call"},
   pace:      {n:480,pct:49.6,note:"OUR totals model (offense/defense ratings) vs the closing total, 8+ pt gap: 54% / 40% / 53%. The market's totals beat ours in college — held at lean"},
   ratings:   {n:1025,pct:50.4,note:"OUR ratings vs the closer in college: 49.2% / 47.5% / 55.0%. Does not hold — held at lean"},
   homedog:   {n:838,pct:50.2,note:"college home dogs ATS — nothing, three years"},
@@ -976,6 +986,23 @@ function callNumber(g,dir,live){
   return `${dir} ${mine>0?"+":""}${mine}`;
 }
 /* THE CALL — the one thing a card has to say plainly: bet this, this much, or don't. */
+/* When to bet, from three seasons of open-to-close movement on each spot:
+   "early" = the market historically moves AGAINST you by kickoff; "late" = it moves your way. */
+const TIMING={
+  hightotal:{when:"early",txt:"totals of 60+ dropped from open to close 57% of the time (avg 0.8 pts) — the number is best right now"},
+  bigfav:{when:"early",txt:"NFL favorites of 10+ grew by ~2 pts from open to close 72% of the time — bet before it moves"},
+  fav10:{when:"early",txt:"NFL favorites of 10+ grew by ~2 pts from open to close 72% of the time"},
+  unrfavfcs:{when:"early",txt:"this spot's favorite got more expensive by kickoff 70% of the time (avg 1.3 pts)"},
+  dog7to9:{when:"late",txt:"the market moved against these dogs 82% of the time — the number usually gets better closer to kickoff"},
+  keycross:{when:"late",txt:"once a line crosses a key number toward the favorite it tends to keep going — wait"},
+  rank28:{when:"late",txt:"huge ranked spreads kept growing to kickoff 64% of the time — the dog's number improves if you wait"},
+  dogimp10:{when:"neutral",txt:"the total moved your way about half the time — no timing edge either way"},
+  rankclash:{when:"neutral",txt:"no consistent open-to-close drift on this spot"}
+};
+function timingNote(b){
+  const t=b&&b.cats.map(c=>TIMING[c]).find(Boolean); if(!t) return "";
+  return `<div class="cb2 timing ${t.when}">⏱ ${t.when==="early"?"<b>Bet early.</b>":t.when==="late"?"<b>Wait if you can.</b>":"<b>Timing neutral.</b>"} ${t.txt}.</div>`;
+}
 function callBox(g){
   const live=g.state==="in";
   const b=bestPlay(g);
@@ -986,6 +1013,7 @@ function callBox(g){
       <div class="cb1">${b.cut?"◆ STRONG":"▶ "+(live?"LIVE BET":"BET")}: ${num}</div>
       <div class="cb2"><b>${stake}</b> · <b>${b.p}%</b> est. hit rate</div>
       <div class="cb2">Because: ${b.lead.play}${b.cats.length>1?` + ${b.cats.length-1} more signal${b.cats.length>2?"s":""} agreeing`:""}</div>
+      ${timingNote(b)}${(()=>{const d=state.detail[g.id]||{}; const isTot=b.dir==="OVER"||b.dir==="UNDER"; const o=isTot?d.openTotal:d.openSpread, c=isTot?g.total:g.spread; return (o!=null&&c!=null&&o!==c)?`<div class="cb2 dim">Opened ${isTot?o:(o>0?"+":"")+o} → now ${isTot?c:(c>0?"+":"")+c}</div>`:"";})()}
     </div>`;
   }
   const E=edgesFor(g);
@@ -1384,7 +1412,7 @@ function fmtLine(v,homeAb,awayAb){
 // only the in-play signals.
 const WEATHER_CATS=new Set(["wind","precip","cold","heat"]);
 const CROSS_LEAGUE_CATS=new Set([]);   // reserved: a signal positive in both leagues in every season
-const LEAN_ONLY_CATS=new Set(["dog7to9","fav10","bigfav","smallfav","rank28","rankclash","unrfavfcs","lowlast","external","priorblend","pace"]); // consistent-ish but not every season / thin: never strong on their own // consistent but thin or mechanism-less: never strong
+const LEAN_ONLY_CATS=new Set(["dog7to9","fav10","bigfav","smallfav","rank28","rankclash","unrfavfcs","lowlast","external","priorblend","pace","steam","keycross"]); // consistent-ish but not every season / thin: never strong on their own // consistent but thin or mechanism-less: never strong
 /* The signal engine used to be re-run for the same game a dozen times per render
    (card, chips, call box, best play, exposure, top plays…). Memoize per render:
    invalidateEdges() is called whenever games or details change. */
@@ -1525,6 +1553,16 @@ function edgesForRaw(g){
           why:`Looks like the huge-dog spot, but ${dog} is an FCS program${dogT.conf==null?" (or its conference is unlisted)":""}. Measured on 2025, ranked teams laying 28+ against FCS opponents covered about half the time (dog 52.6%, and only 46% in weeks 1-2) — a coin flip, not an edge. Shown so you know why it isn't a call.`});
       }
     }
+    // SHARP MONEY AGAINST THE BRAND — three-for-three (2023-25): when the line has moved
+    // 1+ point AGAINST a ranked team (toward the unranked side) from open to now, the
+    // unranked side covered 58% / 58% / 53% (n=211). Following moves in general does
+    // nothing; this specific one — money leaving the name-brand team — does.
+    if(d.openSpread!=null&&g.spread!=null&&Math.abs(g.spread)<28){
+      const mv=g.spread-d.openSpread;                    // >0: moved toward the away team
+      const hR=ranked(hr), aR=ranked(ar);
+      if(hR&&!aR&&mv>=1) E.push({k:"lean",dir:g.away.ab,cat:"steamunr",play:`${g.away.ab} — line moved ${mv.toFixed(1)} against #${hr} ${g.home.ab}`,why:`Opened ${g.home.ab} ${d.openSpread>0?"+":""}${d.openSpread}, now ${g.spread>0?"+":""}${g.spread}: the market has moved <b>${mv.toFixed(1)} points away from the ranked team</b>. The public bets the brand; when the number still moves the other way it's sharp money. Unranked side covered <b>58% / 58% / 53%</b> across 2023-25 (n=211).`});
+      if(aR&&!hR&&mv<=-1) E.push({k:"lean",dir:g.home.ab,cat:"steamunr",play:`${g.home.ab} — line moved ${(-mv).toFixed(1)} against #${ar} ${g.away.ab}`,why:`Opened ${g.home.ab} ${d.openSpread>0?"+":""}${d.openSpread}, now ${g.spread>0?"+":""}${g.spread}: the market has moved <b>${(-mv).toFixed(1)} points away from the ranked team</b>. The public bets the brand; when the number still moves the other way it's sharp money. Unranked side covered <b>58% / 58% / 53%</b> across 2023-25 (n=211).`});
+    }
     // EARLY-SEASON PRIOR BLEND (weeks 1-4 only): last season's ratings, 8-games-strong,
     // blended with this season's. Walk-forward 2023-25: 52% / 69% / 58% at a 3-6 pt gap
     // (n=199). Two strong years and one break-even, so a lean with a good prior.
@@ -1561,6 +1599,12 @@ function edgesForRaw(g){
       E.push({k:"lean",dir:"UNDER",cat:"hightotal",play:`Lean UNDER ${total} — 60+ total`,
         why:`Totals of 60 or more overshoot: UNDER hit <b>60.7% in 2024 and 53.4% in 2025</b> (n=223). Held out-of-sample — the market keeps pricing shootouts that come in a touchdown short.`});
     }
+  }
+  // KEY-NUMBER CROSS (NFL): the line pushed THROUGH 3 or 7 toward the favorite since it
+  // opened -> the dog now has the key number. 58% (n=69, 2024-25 only), lean.
+  if(g.lg==="nfl"&&d.openSpread!=null&&g.spread!=null){
+    const o=Math.abs(d.openSpread), c=Math.abs(g.spread), grew=c>o&&Math.sign(g.spread)===Math.sign(d.openSpread);
+    if(grew&&[3,7].some(k=>o<k&&c>=k)){ const dog=g.spread>0?g.home.ab:g.away.ab; E.push({k:"lean",dir:dog,cat:"keycross",play:`${dog} +${c} — line crossed a key number`,why:`Opened at ${o}, now ${c}: the favorite got pushed through ${o<3&&c>=3?"3":"7"}. Dogs that pick up a key number this way covered <b>58%</b> in 2024-25 (n=69; no 2023 sample). Lean only — and this is the one spot where <b>waiting</b> pays: these numbers tend to keep improving for the dog toward kickoff.`}); }
   }
   // HELD OUT-OF-SAMPLE (NFL): dogs of +7 to +9.5 covered 61.4% (2024 65.8%, 2025 57.8%, n=83);
   // favorites of 10+ covered 58.0% (57.9%/58.1%, n=50). Both lean-capped (thin), both honest.
@@ -2203,6 +2247,7 @@ function renderTrackRecord(){
     <br><br><b>Three-for-three:</b> college total 60+ → UNDER (55% / 61% / 53%) · college dog implied ≤10 → OVER (54% / 56% / 58%) · NFL both teams' last game went UNDER → OVER (55% / 59% / 63%) · our NFL power ratings vs the closer from week 10 (54% / 59% / 57%) · NFL favorites of 10+ (52% / 58% / 58%, thin).
     <br><br><b>Two out of three — leans with a prior, never a call alone:</b> ranked vs ranked UNDER (51% / 56% / 62%) · unranked laying 21+ vs FCS → favorite (<b>43%</b> / 58% / 59%) · NFL dog +7 to +9.5 (49% / 66% / 58%) · either team's last game ≤30 → OVER · NFL small favorites (57% / 55% / 51%).
     <br><br><b>Looked great for one season, died in another — removed:</b> ranked laying 28+ → dog (51% / 43% / 62%) · team held to ≤7 last game · fade the rested college team · NFL primetime dog (37% in 2024) · CFB total ≤45 UNDER (38% in 2024) · NFL 4pm-window OVER (48% in 2023) · Sunday-night UNDER (50% in 2025) · our <b>college</b> power ratings (49% / 48% / 55%).
+    <br><br><b>Line-movement findings (true opening vs closing lines, 2023-25, 2,542 games):</b> following or fading moves does nothing in either league — except one: in college, a line moving 1+ point <i>against a ranked team</i> means the unranked side covers (58% / 58% / 53%, n=211), now live. The bigger finding is <b>timing</b>: on 60+ totals the market itself moves the total down by kickoff 57% of the time, so that play is worth more early in the week; NFL favorites of 10+ gain ~2 points by close (bet early); NFL dogs at +7 to +9.5 see the number move <i>against</i> them 82% of the time (wait). Each call now carries a ⏱ timing note.
     <br><br><b>Model findings:</b> our NFL power ratings beat the closer from week 10 in all three seasons and every attempt to add prior-season strength made them <i>worse</i> (blending toward the market removes the edge). College is the reverse: current-season ratings never beat the closer, but last season's ratings blended in for weeks 1-4 went 52% / 69% / 58% — now live as a lean. Our totals models (offense/defense ratings, simple averages, market blends) do <b>not</b> beat closing totals in either league, so total projections are shown as context and never as a call.
     <br><br><b>Negative all three years:</b> college home dogs in the final two weeks of the regular season (40% / 38% / 38%). <b>Dead folklore, three years:</b> home dogs, always-over, divisional unders, revenge games, letdown/bounce-back spots, rest in either direction.</div>
     <div class="sech" style="margin-top:22px">Signal priors <span class="cnt">2023–2025 · 3,371 real games, closing lines</span></div>
@@ -2379,8 +2424,8 @@ function card(g){
     </div>
     ${callBox(g)}
     <div class="lines">
-      <div class="ln"><div class="l">Spread</div><div class="v">${g.details||(live&&d.liveDetails?`<span class="lv">LIVE ${d.liveDetails}</span>`:"—")}${moveTag(g.moveSpread,"")}</div></div>
-      <div class="ln"><div class="l">Total</div><div class="v">${g.total??(live&&d.liveTotal!=null?`<span class="lv">LIVE ${d.liveTotal}</span>`:"—")}${moveTag(g.moveTotal,"")}</div></div>
+      <div class="ln"><div class="l">Spread${d.openSpread!=null&&g.spread!=null&&d.openSpread!==g.spread?` <span class="opn">opened ${d.openSpread>0?"+":""}${d.openSpread}</span>`:""}</div><div class="v">${g.details||(live&&d.liveDetails?`<span class="lv">LIVE ${d.liveDetails}</span>`:"—")}${moveTag(g.moveSpread,"")}</div></div>
+      <div class="ln"><div class="l">Total${d.openTotal!=null&&g.total!=null&&d.openTotal!==g.total?` <span class="opn">opened ${d.openTotal}</span>`:""}</div><div class="v">${g.total??(live&&d.liveTotal!=null?`<span class="lv">LIVE ${d.liveTotal}</span>`:"—")}${moveTag(g.moveTotal,"")}</div></div>
       <div class="ln"><div class="l">ML ${g.away.ab}/${g.home.ab}</div><div class="v" style="font-size:11.5px">${ml(g.mlAway)} / ${ml(g.mlHome)}</div></div>
     </div>
     ${chips?`<div class="sigs">${chips}</div>`:(d.got?`<div class="nodata">No edge — line looks fair for the conditions.</div>`:`<div class="nodata"><span class="spin" style="width:9px;height:9px"></span> checking conditions…</div>`)}
