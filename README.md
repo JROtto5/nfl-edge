@@ -44,6 +44,8 @@ season. Only three-for-three signals can make a strong call on their own.
 | Primetime dog, 4pm over, held-to-≤7, rested-team fade, total ≤45 under | one-season wonders | | removed |
 | Home dogs, always-over, divisional under, revenge, rest | coin flips | coin flips | not signals |
 
+A second wall used true opening/closing lines (line-movement rules: nothing except a move against a ranked team, 58/58/53%) and full box scores (yards per play, turnovers, third downs: nothing — the market prices efficiency; turnover-luck "regression" is a stable loser at 44%). Closing-line-value per spot drives a bet-timing note on every call.
+
 117 rule×league tests were run ("the wall"); every result, including the failures, is
 shown in the app's Results → Advanced section. Weather signals cannot be backtested
 (ESPN strips forecasts from finished games) and can never make a strong call alone.
