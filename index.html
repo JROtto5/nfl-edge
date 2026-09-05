@@ -158,6 +158,11 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .callbox.live{border-color:var(--amber)}
 .callbox.strongcut{border-color:var(--line);border-style:dashed}
 .timing.early{color:var(--green)} .timing.late{color:var(--amber)}
+.cbact{margin-top:6px}.betbtn{font-weight:800}.betbtn.on{border-color:var(--green);color:var(--green)}
+.trow.tk .tkr{display:flex;gap:6px;align-items:center;margin-left:auto}.tkstake{background:var(--bg2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-family:inherit}
+.watchbar{background:var(--panel);border:1px solid var(--amber);border-radius:11px;padding:9px 12px;font-size:13px;margin-bottom:10px}
+.trow.watchrow{border-color:var(--amber)}
+.catchip.sweat{border-color:var(--red);color:var(--red)}.catchip.ticket{border-color:var(--green);color:var(--green)}
 .callbox.strongcut .cb1{font-size:15px}
 .callbox .cb1{font-size:18px;font-weight:800;letter-spacing:.01em;line-height:1.2}
 .callbox .cb2{font-size:13px;color:var(--dim)}
@@ -340,6 +345,7 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
       <button data-view="props">Props</button>
       <button data-view="track">Results</button>
       <button data-view="parlay">Parlay Builder</button>
+      <button data-view="ticket">🎟 Ticket</button>
       <button data-view="alerts">🔔 Alerts <span class="badge" id="bellBadge" style="display:none"></span></button>
       <button data-view="data">⊞ Data</button>
       <button data-view="ext">🔒 Private</button>
@@ -361,7 +367,7 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
 </header>
 <div id="modal" class="modal" hidden></div>
 <nav class="bottomnav" id="bottomNav">
-  <button data-view="board">Board</button><button data-view="top">★ Top</button><button data-view="track">Results</button><button data-view="alerts">🔔</button><button data-view="data">⊞ Data</button>
+  <button data-view="board">Board</button><button data-view="top">★ Top</button><button data-view="ticket">🎟 Ticket</button><button data-view="track">Results</button><button data-view="alerts">🔔</button>
 </nav>
 
 <main>
@@ -608,6 +614,8 @@ async function loadSlate(){
   migrateRecords();
   recordStrongEdges();
   gradeRecords();
+  gradeTicket();
+  sweatCheck();
   refreshLearnedWeights();
   // season-to-date results power our own ratings; refreshed at most hourly since
   // they only change when games finish
@@ -631,7 +639,7 @@ function queueDetails(){
     .filter(g=>{const t=new Date(g.date)-now; return t< 8*864e5;})
     // in-progress games first: they carry the live line and must never be cut by the cap
     .sort((a,b)=>((a.state==="in")?0:1)-((b.state==="in")?0:1) || new Date(a.date)-new Date(b.date))
-    .slice(0,60);
+    .slice(0,140);
   detailQueue=cand.map(g=>g);
   if(!detailRunning) runQueue();
 }
@@ -1062,6 +1070,7 @@ function callBox(g){
       <div class="cb1">${b.cut?"◆ STRONG":"▶ "+(live?"LIVE BET":"BET")}: ${num}</div>
       <div class="cb2"><b>${stake}</b> · <b>${b.p}%</b> est. hit rate${b.odds!=null&&b.odds!==-110?` · at <b>${b.odds>0?"+":""}${b.odds}</b>`:""}</div>
       <div class="cb2">Because: ${b.lead.play}${b.cats.length>1?` + ${b.cats.length-1} more signal${b.cats.length>2?"s":""} agreeing`:""}</div>
+      <div class="cbact"><button class="tbtn betbtn${onTicket(g,b.dir)?" on":""}" data-bet="${g.id}|${b.dir}">${onTicket(g,b.dir)?"✓ On ticket":"Bet this"}</button></div>
       ${timingNote(b)}${(()=>{const d=state.detail[g.id]||{}; const isTot=b.dir==="OVER"||b.dir==="UNDER"; const o=isTot?d.openTotal:d.openSpread, c=isTot?g.total:g.spread; return (o!=null&&c!=null&&o!==c)?`<div class="cb2 dim">Opened ${isTot?o:(o>0?"+":"")+o} → now ${isTot?c:(c>0?"+":"")+c}</div>`:"";})()}
     </div>`;
   }
@@ -1142,10 +1151,98 @@ async function teamNews(lg,teamId){
   }catch(e){ return []; }
 }
 document.getElementById("board").addEventListener("click",e=>{
+  const bb=e.target.closest(".betbtn[data-bet]");
+  if(bb){ const [gid,dir]=bb.dataset.bet.split("|"); const g=state.games.find(x=>x.id===gid); if(!g) return; if(onTicket(g,dir)) removeFromTicket(ticketKey(g,dir)); else addToTicket(g,dir); render(); return; }
   const tm=e.target.closest(".tm[data-team]"); if(!tm) return;
   const g=state.games.find(x=>x.id===tm.dataset.gid); if(g) openTeam(g,tm.dataset.team);
 });
 document.getElementById("modal")?.addEventListener("click",e=>{ if(e.target.id==="modal"||e.target.closest("[data-close]")) document.getElementById("modal").hidden=true; });
+/* ================= MY TICKET =================
+   The bets you actually made, on this device. Each item freezes the line and price at
+   the moment you tapped it, shows live covering/trailing, grades itself at final with
+   real P&L, and fires a "sweat" alert when it's close late. Never sent anywhere. */
+function ticket(){ return lsGet("edgeboard-ticket-v1",[]); }
+function saveTicket(t){ lsSet("edgeboard-ticket-v1",t); }
+function ticketKey(g,dir){ return `${g.id}|${dir}`; }
+function onTicket(g,dir){ return ticket().some(t=>t.key===ticketKey(g,dir)); }
+function addToTicket(g,dir){
+  const t=ticket(); const key=ticketKey(g,dir); if(t.some(x=>x.key===key)) return;
+  const live=g.state==="in", d=state.detail[g.id]||{}; const isTot=dir==="OVER"||dir==="UNDER";
+  const b=bestPlay(g); const stake=(b&&b.dir===dir&&b.stake.dollars>0)?b.stake.dollars:Math.max(1,Math.round((state.bankroll||200)*0.01));
+  t.push({key,gameId:g.id,name:g.name,homeAb:g.home.ab,awayAb:g.away.ab,dir,type:isTot?"total":"spread",live,
+    lineTotal:isTot?(live?d.liveTotal:g.total):null,lineSpread:isTot?null:(live?d.liveSpread:g.spread),
+    price:priceFor(g,dir),stake,label:callNumber(g,dir,live),kickoff:new Date(g.date).getTime(),ts:Date.now(),graded:false});
+  saveTicket(t); pushAlert({kind:"ticket",gameId:g.id,text:`TICKET: ${callNumber(g,dir,live)} — ${g.name} · $${stake} at ${priceFor(g,dir)>0?"+":""}${priceFor(g,dir)}`}); updateBell();
+}
+function removeFromTicket(key){ saveTicket(ticket().filter(t=>t.key!==key)); }
+function ticketStatus(t){ return liveStatus({gameId:t.gameId,type:t.type,dir:t.dir,lineTotal:t.lineTotal,lineSpread:t.lineSpread,homeAb:t.homeAb,awayAb:t.awayAb}); }
+function gradeTicket(){
+  const t=ticket(); let changed=false;
+  t.forEach(x=>{
+    if(x.graded) return; const g=state.games.find(y=>y.id===x.gameId); if(!g||g.state!=="post") return;
+    const hs=Number(g.home.score),as=Number(g.away.score); if(Number.isNaN(hs)||Number.isNaN(as)) return;
+    let res;
+    if(x.type==="total"){ const a=hs+as; res=a===x.lineTotal?"push":((x.dir==="OVER")===(a>x.lineTotal)?"win":"loss"); }
+    else { const cm=(hs-as)+x.lineSpread; res=cm===0?"push":(((cm>0)===(x.dir===x.homeAb))?"win":"loss"); }
+    const dec=americanToDecimal(x.price||-110); x.pnl=res==="win"?Math.round(x.stake*(dec-1)*100)/100:res==="loss"?-x.stake:0;
+    x.graded=true; x.result=res; x.finalHome=hs; x.finalAway=as; changed=true;
+    pushAlert({kind:"ticket",gameId:g.id,text:`TICKET ${res.toUpperCase()}${x.pnl?` ${x.pnl>0?"+":""}$${x.pnl}`:""}: ${x.label} — Final ${x.awayAb} ${as}–${hs} ${x.homeAb}`});
+  });
+  if(changed) saveTicket(t);
+}
+/* Sweat alerts: an open call (board record or ticket item) in the 4th quarter within 7
+   points of its number. Fires once per item. Runs on the server too, so it pushes. */
+function sweatCheck(){
+  const recs=lsGet("edgeboard-record-v1",[]); const tk=ticket(); let recChanged=false,tkChanged=false;
+  const check=(r,label)=>{
+    if(r.graded||r.sweated) return false;
+    const g=state.games.find(x=>x.id===r.gameId); if(!g||g.state!=="in"||!g.period||g.period<4) return false;
+    const st=liveStatus(r); if(!st) return false;
+    const hs=Number(g.home.score),as=Number(g.away.score);
+    const dist=r.type==="total"?Math.abs((hs+as)-r.lineTotal):Math.abs((hs-as)+r.lineSpread);
+    if(dist>7) return false;
+    r.sweated=true; pushAlert({kind:"sweat",gameId:g.id,text:`SWEAT: ${label} — ${r.awayAb} ${as}–${hs} ${r.homeAb}, ${g.short||"4th"} · ${st.ok?"covering":"trailing"} by ${dist}`}); return true;
+  };
+  recs.forEach(r=>{ if(check(r,r.playText)) recChanged=true; });
+  tk.forEach(t=>{ if(check(t,t.label)) tkChanged=true; });
+  if(recChanged) lsSet("edgeboard-record-v1",recs); if(tkChanged) saveTicket(tk);
+}
+function watchList(){   // live games where a board call or ticket item is within 10 points, 3rd quarter on
+  const out=[]; const seen=new Set();
+  [...lsGet("edgeboard-record-v1",[]).filter(r=>!r.graded),...ticket().filter(t=>!t.graded)].forEach(r=>{
+    const g=state.games.find(x=>x.id===r.gameId); if(!g||g.state!=="in"||seen.has(g.id)) return; const st=liveStatus(r); if(!st) return;
+    const hs=Number(g.home.score),as=Number(g.away.score); const dist=r.type==="total"?Math.abs((hs+as)-r.lineTotal):Math.abs((hs-as)+r.lineSpread);
+    if(dist<=10&&(g.period||0)>=3){ seen.add(g.id); out.push({g,r,st,dist}); } });
+  return out.sort((a,b)=>a.dist-b.dist);
+}
+function renderTicket(){
+  const box=document.getElementById("board"); gradeTicket();
+  const t=ticket().slice().sort((a,b)=>(a.kickoff||0)-(b.kickoff||0));
+  const today=new Date(); today.setHours(0,0,0,0);
+  const settled=t.filter(x=>x.graded), open=t.filter(x=>!x.graded);
+  const pnlToday=settled.filter(x=>x.kickoff>=today.getTime()).reduce((a,x)=>a+(x.pnl||0),0), pnlAll=settled.reduce((a,x)=>a+(x.pnl||0),0);
+  const w=settled.filter(x=>x.result==="win").length,l=settled.filter(x=>x.result==="loss").length; const risk=open.reduce((a,x)=>a+x.stake,0);
+  const row=x=>{ const g=state.games.find(y=>y.id===x.gameId); const live=g&&g.state==="in"; const st=live?ticketStatus(x):null;
+    const badge=x.graded?`<span class="rbadge ${x.result==="win"?"win":x.result==="push"?"push":"loss"}">${x.result.toUpperCase()}${x.pnl?` ${x.pnl>0?"+":"−"}$${Math.abs(x.pnl)}`:""}</span>`:(st?`<span class="rbadge ${st.ok?"win":"loss"} live">LIVE · ${st.ok?"covering":"trailing"}</span>`:`<span class="rbadge pend">${g?fmtTime(g.date):"pending"}</span>`);
+    const sub=x.graded?`Final ${x.awayAb} ${x.finalAway}–${x.finalHome} ${x.homeAb}`:(st?st.txt:(live?`${g.away.ab} ${g.away.score}–${g.home.score} ${g.home.ab} · ${g.short||""}`:`${x.name}`));
+    return `<div class="trow tk">${badge}<div class="tbody"><div class="tplay">${x.label} <span class="dim">@${x.price>0?"+":""}${x.price}</span></div><div class="tsub">${sub}</div></div>
+      <div class="tkr"><label class="dim" style="font-size:10px">$ <input type="number" class="tkstake" data-key="${x.key}" value="${x.stake}" min="1" style="width:56px" ${x.graded?"disabled":""}></label>${x.graded?"":`<button class="tbtn tkrm" data-key="${x.key}" title="Remove">✕</button>`}</div></div>`; };
+  const watch=watchList();
+  box.innerHTML=`<div class="tkpis">
+      <div class="tk"><div class="tn ${pnlToday>=0?"pos":"neg"}">${pnlToday>=0?"+":"−"}$${Math.abs(pnlToday).toFixed(0)}</div><div class="tl">Today</div></div>
+      <div class="tk"><div class="tn ${pnlAll>=0?"pos":"neg"}">${pnlAll>=0?"+":"−"}$${Math.abs(pnlAll).toFixed(0)}</div><div class="tl">All time</div></div>
+      <div class="tk"><div class="tn">${w}-${l}</div><div class="tl">Record</div></div>
+      <div class="tk"><div class="tn">$${risk}</div><div class="tl">Open risk</div></div></div>
+    <div class="note">Tap <b>Bet this</b> on any call to put it here. The line and price freeze at that moment; each item shows live covering/trailing, grades itself at final with real P&amp;L, and fires a <b>SWEAT</b> alert when it's inside a touchdown in the 4th. Device-only — your ticket is nobody's business.</div>
+    ${watch.length?`<div class="sech">🔥 Games to watch <span class="cnt">${watch.length} close late</span></div>${watch.map(x=>`<div class="trow watchrow"><span class="rbadge ${x.st.ok?"win":"loss"} live">${x.st.ok?"covering":"trailing"} by ${x.dist}</span><div class="tbody"><div class="tplay">${x.r.playText||x.r.label}</div><div class="tsub">${x.st.txt}</div></div></div>`).join("")}`:""}
+    ${open.length?`<div class="sech">Open <span class="cnt">${open.length}</span></div>${open.map(row).join("")}`:'<div class="empty">Nothing on the ticket. Tap <b>Bet this</b> on a call.</div>'}
+    ${settled.length?`<div class="sech" style="margin-top:18px">Settled <span class="cnt">${settled.length}</span></div>${settled.slice().reverse().map(row).join("")}`:""}
+    ${t.length?`<div class="prow"><button class="tbtn" id="tkClearSettled">Clear settled</button></div>`:""}`;
+  box.querySelectorAll(".tkstake").forEach(el=>el.addEventListener("change",e=>{ const tt=ticket(); const it=tt.find(x=>x.key===e.target.dataset.key); if(it){ it.stake=Math.max(1,Number(e.target.value)||1); saveTicket(tt); renderTicket(); } }));
+  box.querySelectorAll(".tkrm").forEach(el=>el.addEventListener("click",e=>{ removeFromTicket(e.currentTarget.dataset.key); renderTicket(); }));
+  document.getElementById("tkClearSettled")?.addEventListener("click",()=>{ saveTicket(ticket().filter(x=>!x.graded)); renderTicket(); });
+  updateLive();
+}
 /* ================= PRIVATE EXTERNAL PICKS =================
    Picks from an outside source the owner has access to, pasted in by hand (or later
    pulled from a feed they control). Stored ONLY in this browser's localStorage — it is
@@ -1283,7 +1380,7 @@ function renderAlerts(){
   const seen=lsGet("edgeboard-alerts-seen",0);
   const supported=typeof Notification!=="undefined";
   const on=!!lsGet("edgeboard-notify",0)&&supported&&Notification.permission==="granted";
-  const kindTag={call:"NEW CALL",live:"LIVE BET",fade:"FADED",result:"RESULT",steam:"LINE MOVE"};
+  const kindTag={call:"NEW CALL",live:"LIVE BET",fade:"FADED",result:"RESULT",steam:"LINE MOVE",sweat:"SWEAT",ticket:"TICKET"};
   const rows=list.slice(0,100).map(a=>`<div class="arow${a.ts>seen?" unread":""}"><span class="catchip ${a.kind}">${kindTag[a.kind]||a.kind}</span><div class="abody"><div class="atext">${a.text}</div><div class="atime">${new Date(a.ts).toLocaleString(undefined,{weekday:"short",hour:"numeric",minute:"2-digit"})}</div></div></div>`).join("");
   box.innerHTML=`<div class="note"><b>What you get alerted on:</b> a new strong call, a live bet triggering, a call fading before kickoff, a line moving 2+ points, and every result. Generated by this app while it's running <b>and</b> by the server grader every 10 minutes, so nothing is missed while the app is closed${srv.length?` (${srv.length} from the server)`:""}.</div>
     <div class="prow" style="align-items:center">
@@ -1995,7 +2092,7 @@ function renderTop(){
         <div class="topplay">◦ WATCH: ${callNumber(r.g,r.dir,r.g.state==="in")}</div>
         <div class="topgame">${r.g.name} · ${fmtTime(r.g.date)} · ${r.lead.play}</div>
         <div class="topcats">${r.cats.map(c=>`<span class="catchip">${c}</span>`).join("")}</div></div>
-        <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">no stake</div></div></div>`).join("")||'<div class="empty">Nothing leaning either — the slate looks priced fairly.</div>'}`;
+        <div class="topsupport"><button class="tbtn betbtn${onTicket(r.g,r.dir)?" on":""}" data-bet="${r.g.id}|${r.dir}" style="margin-bottom:4px">${onTicket(r.g,r.dir)?"✓":"Bet"}</button><div class="tsn">${r.p}%</div><div class="tsl">no stake</div></div></div>`).join("")||'<div class="empty">Nothing leaning either — the slate looks priced fairly.</div>'}`;
     updateLive(); return;
   }
   const ex=recomputeExposure();
@@ -2512,6 +2609,7 @@ function render(){
   if(state.view==="alerts"){ renderAlerts(); return; }
   if(state.view==="data"){ renderData(); return; }
   if(state.view==="ext"){ renderExt(); return; }
+  if(state.view==="ticket"){ renderTicket(); return; }
   if(state.view==="parlay"){ renderParlay(); return; }
   if(state.view==="top"){ renderTop(); return; }
   if(state.view==="props"){ renderProps(); return; }
@@ -2531,7 +2629,8 @@ function render(){
   const strip=(()=>{
     const open=gs.filter(g=>g.state!=="post"); const strongs=open.map(g=>bestPlay(g)).filter(Boolean); const bets=strongs.filter(b=>!b.cut);
     const stake=bets.reduce((a,b)=>a+(b.stake.dollars||0),0); const lv=open.filter(g=>g.state==="in").length;
-    return `<div class="strip"><div><b>${bets.length}</b> bet${bets.length===1?"":"s"}${strongs.length>bets.length?`<span class="cap">+${strongs.length-bets.length} strong, no stake</span>`:""}</div><div><b>$${stake}</b> total stake${exposureFactor<1?`<span class="cap">capped at ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll</span>`:""}</div><div><b>${lv}</b> live</div><div><b>${open.length-bets.length}</b> no-bet</div></div>`;
+    const wl=watchList();
+    return `${wl.length?`<div class="watchbar">🔥 <b>${wl.length}</b> close late: ${wl.slice(0,3).map(x=>`${x.r.awayAb} @ ${x.r.homeAb} (${x.st.ok?"covering":"trailing"} by ${x.dist})`).join(" · ")}</div>`:""}<div class="strip"><div><b>${bets.length}</b> bet${bets.length===1?"":"s"}${strongs.length>bets.length?`<span class="cap">+${strongs.length-bets.length} strong, no stake</span>`:""}</div><div><b>$${stake}</b> total stake${exposureFactor<1?`<span class="cap">capped at ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll</span>`:""}</div><div><b>${lv}</b> live</div><div><b>${open.length-bets.length}</b> no-bet</div></div>`;
   })();
   if(state.sort==="best"){
     // Best bets of the week: only games with a STRONG directional play, ranked by
@@ -2594,7 +2693,7 @@ document.getElementById("leagueSeg").addEventListener("click",e=>{const b=e.targ
 // intro stays open until it's been read once, then folds
 (()=>{ const el=document.getElementById("introNote"); if(!el) return; el.open=!lsGet("edgeboard-intro-read",0); el.addEventListener("toggle",()=>{ if(!el.open) lsSet("edgeboard-intro-read",1); }); })();
 // deep links: #top #props #results #parlay #alerts #data
-(()=>{ const h=String((typeof location!=="undefined"&&location.hash)||"").replace("#",""); const map={top:"top",props:"props",results:"track",track:"track",parlay:"parlay",alerts:"alerts",data:"data",board:"board",ext:"ext",private:"ext"};
+(()=>{ const h=String((typeof location!=="undefined"&&location.hash)||"").replace("#",""); const map={top:"top",props:"props",results:"track",track:"track",parlay:"parlay",alerts:"alerts",data:"data",board:"board",ext:"ext",private:"ext",ticket:"ticket"};
   if(map[h]){ state.view=map[h]; document.querySelectorAll("#viewSeg [data-view],#bottomNav [data-view]").forEach(x=>x.dataset.on=(x.dataset.view===state.view)?"1":"0"); } })();
 document.getElementById("edgesOnly").addEventListener("change",e=>{state.edgesOnly=e.target.checked;render();});
 document.getElementById("betsOnly").addEventListener("change",e=>{state.betsOnly=e.target.checked;render();});
