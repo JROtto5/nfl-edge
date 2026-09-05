@@ -947,10 +947,10 @@ function rawKelly(p,odds){
 }
 function recomputeExposure(){
   const cands=[];
-  state.games.filter(g=>g.state!=="post").forEach(g=>{ const b=bestPlayRaw(g); if(b) cands.push({key:`${g.id}|${b.dir}`,p:b.p,n:b.cats.length}); });
+  state.games.filter(g=>g.state!=="post").forEach(g=>{ const b=bestPlayRaw(g); if(b) cands.push({key:`${g.id}|${b.dir}`,p:b.p,n:b.cats.length,odds:priceFor(g,b.dir)}); });
   cands.sort((a,b)=>b.p-a.p||b.n-a.n);
   betCut=new Set(cands.slice(0,MAX_BETS).map(c=>c.key));
-  let sum=0; cands.slice(0,MAX_BETS).forEach(c=>{ sum+=rawKelly(c.p,-110); });
+  let sum=0; cands.slice(0,MAX_BETS).forEach(c=>{ sum+=rawKelly(c.p,c.odds); });
   exposureFactor=sum>WEEKLY_EXPOSURE_CAP?WEEKLY_EXPOSURE_CAP/sum:1;
   return {sum,factor:exposureFactor,total:cands.length,cut:Math.min(MAX_BETS,cands.length)};
 }
@@ -999,6 +999,13 @@ function bestPlayRaw(g){
   Object.entries(byDir).forEach(([dir,list])=>{ const cats=[...new Set(list.map(e=>e.cat))]; const pr=playProb(cats,g.lg,g); if(pr&&(!best||pr.p>best.p)) best={dir,cats,p:pr.p}; });
   return best;
 }
+/* The price actually on offer for a side/total, from ESPN's book data; -110 if unknown. */
+function priceFor(g,dir){
+  const d=state.detail[g.id]||{};
+  if(dir==="OVER") return d.overOdds??-110; if(dir==="UNDER") return d.underOdds??-110;
+  if(dir===g.home.ab) return d.homeSpreadOdds??d.spreadOdds??-110; if(dir===g.away.ab) return d.awaySpreadOdds??d.spreadOdds??-110;
+  return -110;
+}
 function bestPlay(g){
   const E=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
   const byDir={}; E.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
@@ -1006,7 +1013,7 @@ function bestPlay(g){
   Object.entries(byDir).forEach(([dir,list])=>{
     const cats=[...new Set(list.map(e=>e.cat))];
     const pr=playProb(cats,g.lg,g); if(!pr) return;
-    if(!best||pr.p>best.p) best={dir,cats,p:pr.p,src:pr.src,lead:list[0],stake:kellyStake(pr.p,-110)};
+    if(!best||pr.p>best.p) best={dir,cats,p:pr.p,src:pr.src,lead:list[0],odds:priceFor(g,dir),stake:kellyStake(pr.p,priceFor(g,dir))};
   });
   if(best&&betCut.size&&!betCut.has(`${g.id}|${best.dir}`)){ best.cut=true; best.stake={f:0,pct:0,dollars:0,capped:false,cut:true}; }
   return best;
@@ -1046,7 +1053,7 @@ function callBox(g){
     const stake=b.cut?`no stake <span class="cb3">(strong, but outside this week's top ${MAX_BETS} by edge)</span>`:(b.stake.dollars>0?`$${b.stake.dollars} <span class="cb3">(${b.stake.pct}% of $${state.bankroll}, ¼-Kelly)</span>`:`no stake <span class="cb3">(est. under break-even)</span>`);
     return `<div class="callbox ${b.cut?"strongcut":"bet"}${live?" live":""}">
       <div class="cb1">${b.cut?"◆ STRONG":"▶ "+(live?"LIVE BET":"BET")}: ${num}</div>
-      <div class="cb2"><b>${stake}</b> · <b>${b.p}%</b> est. hit rate</div>
+      <div class="cb2"><b>${stake}</b> · <b>${b.p}%</b> est. hit rate${b.odds!=null&&b.odds!==-110?` · at <b>${b.odds>0?"+":""}${b.odds}</b>`:""}</div>
       <div class="cb2">Because: ${b.lead.play}${b.cats.length>1?` + ${b.cats.length-1} more signal${b.cats.length>2?"s":""} agreeing`:""}</div>
       ${timingNote(b)}${(()=>{const d=state.detail[g.id]||{}; const isTot=b.dir==="OVER"||b.dir==="UNDER"; const o=isTot?d.openTotal:d.openSpread, c=isTot?g.total:g.spread; return (o!=null&&c!=null&&o!==c)?`<div class="cb2 dim">Opened ${isTot?o:(o>0?"+":"")+o} → now ${isTot?c:(c>0?"+":"")+c}</div>`:"";})()}
     </div>`;
@@ -1957,7 +1964,7 @@ function topPlays(limit){
       const cats=[...new Set(list.map(e=>e.cat))];
       const pr=playProb(cats,g.lg,g)||{p:0,src:"prior"};
       const inCut=betCut.has(`${g.id}|${dir}`);
-      rows.push({g,dir,cats,support:cats.length,lead:list[0],p:pr.p,src:pr.src,stake:inCut?kellyStake(pr.p,-110):{f:0,pct:0,dollars:0,capped:false,cut:true},
+      rows.push({g,dir,cats,support:cats.length,lead:list[0],p:pr.p,src:pr.src,odds:priceFor(g,dir),stake:inCut?kellyStake(pr.p,priceFor(g,dir)):{f:0,pct:0,dollars:0,capped:false,cut:true},
         kick:new Date(g.date)});
     });
   });
@@ -1995,7 +2002,7 @@ function renderTop(){
         <div class="topgame">${r.g.name} · ${r.g.state==="in"?`LIVE ${r.g.away.score}–${r.g.home.score} ${r.g.short}`:fmtTime(r.g.date)} · because: ${r.lead.play}</div>
         <div class="topcats">${r.cats.map(c=>`<span class="catchip">${c}</span>`).join("")} <span class="srcnote">${r.src==="live"?"own record":r.src==="backtest"?"2025 backtest":"default prior"}</span></div>
       </div>
-      <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">${betCut.has(`${r.g.id}|${r.dir}`)?(r.stake.dollars>0?`¼-Kelly $${r.stake.dollars}`:"no stake"):"below the cut"}</div><div class="tsl">${r.support} signal${r.support===1?"":"s"}</div></div>
+      <div class="topsupport"><div class="tsn">${r.p}%</div><div class="tsl">${betCut.has(`${r.g.id}|${r.dir}`)?(r.stake.dollars>0?`¼-Kelly $${r.stake.dollars}${r.odds!==-110?` @${r.odds>0?"+":""}${r.odds}`:""}`:"no stake"):"below the cut"}</div><div class="tsl">${r.support} signal${r.support===1?"":"s"}</div></div>
     </div>`).join("")}`;
   document.getElementById("bankrollInput")?.addEventListener("change",e=>{ state.bankroll=Math.max(0,Number(e.target.value)||0); lsSet("edgeboard-bankroll",state.bankroll); renderTop(); });
   updateLive();
