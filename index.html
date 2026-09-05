@@ -599,6 +599,8 @@ async function loadSlate(){
   // in-progress games carry the live line — re-pull their details on every poll
   const liveNow=out.filter(g=>g.state==="in");
   if(liveNow.length){ liveNow.forEach(g=>{ if(!detailQueue.some(x=>x.id===g.id)) detailQueue.push(g); }); if(!detailRunning) runQueue(); }
+  // backstop for the server grader: nudge it if the shared record is stale (cheap no-op otherwise)
+  if(API&&!apiDown){ fetch(`${API}/tick`,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.ran){ state.server=null; loadServerRecord(true); } }).catch(()=>{}); }
   // switch poll speed when games start or finish
   if((liveNow.length>0)!==pollFast&&typeof document!=="undefined"&&!document.hidden&&pollA) startPolling();
   render();

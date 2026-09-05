@@ -22,6 +22,10 @@
     },
     "api/record.js": {
       "maxDuration": 10
+    },
+    "api/tick.js": {
+      "maxDuration": 60,
+      "includeFiles": "index.html"
     }
   }
 }
