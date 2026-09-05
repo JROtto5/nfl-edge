@@ -1447,7 +1447,7 @@ function fmtLine(v,homeAb,awayAb){
 // only the in-play signals.
 const WEATHER_CATS=new Set(["wind","precip","cold","heat"]);
 const CROSS_LEAGUE_CATS=new Set([]);   // reserved: a signal positive in both leagues in every season
-const LEAN_ONLY_CATS=new Set(["dog7to9","fav10","bigfav","smallfav","rank28","rankclash","unrfavfcs","lowlast","external","priorblend","pace","steam","keycross"]); // consistent-ish but not every season / thin: never strong on their own // consistent but thin or mechanism-less: never strong
+const LEAN_ONLY_CATS=new Set(["dog7to9","fav10","bigfav","smallfav","rank28","rankclash","unrfavfcs","lowlast","external","priorblend","pace","steam","keycross","mtotal"]); // mtotal: its strong tier is decided by the model's own >=58% threshold, never by promotion // consistent-ish but not every season / thin: never strong on their own // consistent but thin or mechanism-less: never strong
 /* The signal engine used to be re-run for the same game a dozen times per render
    (card, chips, call box, best play, exposure, top plays…). Memoize per render:
    invalidateEdges() is called whenever games or details change. */
