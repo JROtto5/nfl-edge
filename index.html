@@ -1193,11 +1193,51 @@ function addToTicket(g,dir){
   saveTicket(t); pushAlert({kind:"ticket",gameId:g.id,text:`TICKET: ${callNumber(g,dir,live)} — ${g.name} · $${stake} at ${priceFor(g,dir)>0?"+":""}${priceFor(g,dir)}`}); updateBell();
 }
 function removeFromTicket(key){ saveTicket(ticket().filter(t=>t.key!==key)); }
+/* A parlay: several legs (each a board market on a game) at ONE price you entered
+   (boosts welcome). Legs freeze their lines now; the parlay grades when every leg is
+   final — any loss = loss, pushes drop out, all remaining wins = win at your price. */
+function legOptions(){
+  const out=[];
+  state.games.filter(g=>g.state==="pre").forEach(g=>{
+    const dirs=new Set(edgesFor(g).filter(e=>e.dir&&!e.stacked&&!e.conflict).map(e=>e.dir));
+    if(g.total!=null){ dirs.add("OVER"); dirs.add("UNDER"); }
+    if(g.spread!=null){ dirs.add(g.home.ab); dirs.add(g.away.ab); }
+    [...dirs].forEach(dir=>out.push({gameId:g.id,dir,label:`${callNumber(g,dir,false)} · ${g.name} · ${fmtTime(g.date)}`}));
+  });
+  return out;
+}
+function addParlay(legSpecs,price,stake){
+  const legs=legSpecs.map(({gameId,dir})=>{ const g=state.games.find(x=>x.id===gameId); if(!g) return null; const isTot=dir==="OVER"||dir==="UNDER";
+    return {gameId,name:g.name,homeAb:g.home.ab,awayAb:g.away.ab,dir,type:isTot?"total":"spread",lineTotal:isTot?g.total:null,lineSpread:isTot?null:g.spread,label:callNumber(g,dir,false),kickoff:new Date(g.date).getTime()}; }).filter(Boolean);
+  if(legs.length<2) return false;
+  const t=ticket(); const key=`parlay|${Date.now()}`;
+  t.push({key,parlay:true,legs,price,stake,label:legs.map(l=>l.label).join(" + "),name:`${legs.length}-leg parlay`,kickoff:Math.min(...legs.map(l=>l.kickoff)),lastKick:Math.max(...legs.map(l=>l.kickoff)),ts:Date.now(),graded:false});
+  saveTicket(t); pushAlert({kind:"ticket",text:`TICKET: ${legs.length}-leg parlay at ${price>0?"+":""}${price} · $${stake} — ${legs.map(l=>l.label).join(" + ")}`}); return true;
+}
+function gradeLeg(l){
+  const g=state.games.find(y=>y.id===l.gameId); if(!g||g.state!=="post") return null;
+  const hs=Number(g.home.score),as=Number(g.away.score); if(Number.isNaN(hs)||Number.isNaN(as)) return null;
+  if(l.type==="total"){ const a=hs+as; return a===l.lineTotal?"push":((l.dir==="OVER")===(a>l.lineTotal)?"win":"loss"); }
+  const cm=(hs-as)+l.lineSpread; return cm===0?"push":(((cm>0)===(l.dir===l.homeAb))?"win":"loss");
+}
+function parlayStatus(x){   // per-leg live/graded status text
+  return x.legs.map(l=>{ const g=state.games.find(y=>y.id===l.gameId); const r=gradeLeg(l); if(r) return `${l.label}: <b class="${r==="win"?"pos":r==="loss"?"neg":""}">${r.toUpperCase()}</b>`;
+    if(g&&g.state==="in"){ const st=liveStatus(l); return `${l.label}: <span class="${st&&st.ok?"pos":"neg"}">${st?(st.ok?"covering":"trailing"):"live"}</span> · ${g.away.ab} ${g.away.score}–${g.home.score} ${g.home.ab} ${g.short||""}`; }
+    return `${l.label}: ${g?fmtTime(g.date):"pending"}`; }).join("<br>");
+}
 function ticketStatus(t){ return liveStatus({gameId:t.gameId,type:t.type,dir:t.dir,lineTotal:t.lineTotal,lineSpread:t.lineSpread,homeAb:t.homeAb,awayAb:t.awayAb}); }
 function gradeTicket(){
   const t=ticket(); let changed=false;
   t.forEach(x=>{
-    if(x.graded) return; const g=state.games.find(y=>y.id===x.gameId); if(!g||g.state!=="post") return;
+    if(x.graded) return;
+    if(x.parlay){
+      const rs=x.legs.map(gradeLeg); if(rs.some(r=>r==="loss")){ x.graded=true; x.result="loss"; x.pnl=-x.stake; changed=true; pushAlert({kind:"ticket",text:`TICKET LOSS −$${x.stake}: parlay — ${x.legs.map((l,i)=>`${l.label} ${rs[i]||"open"}`).join(", ")}`}); return; }
+      if(rs.some(r=>r===null)) return;                      // still waiting on a leg
+      const live=rs.filter(r=>r==="win").length; if(!live){ x.graded=true; x.result="push"; x.pnl=0; changed=true; return; }
+      x.graded=true; x.result="win"; x.pnl=Math.round(x.stake*(americanToDecimal(x.price)-1)*100)/100; if(rs.some(r=>r==="push")) x.note="a leg pushed — payout shown at your full price; your book will have reduced it"; changed=true;
+      pushAlert({kind:"ticket",text:`TICKET WIN +$${x.pnl}: parlay at ${x.price>0?"+":""}${x.price} — ${x.label}`}); return;
+    }
+    const g=state.games.find(y=>y.id===x.gameId); if(!g||g.state!=="post") return;
     const hs=Number(g.home.score),as=Number(g.away.score); if(Number.isNaN(hs)||Number.isNaN(as)) return;
     let res;
     if(x.type==="total"){ const a=hs+as; res=a===x.lineTotal?"push":((x.dir==="OVER")===(a>x.lineTotal)?"win":"loss"); }
@@ -1222,12 +1262,12 @@ function sweatCheck(){
     r.sweated=true; pushAlert({kind:"sweat",gameId:g.id,text:`SWEAT: ${label} — ${r.awayAb} ${as}–${hs} ${r.homeAb}, ${g.short||"4th"} · ${st.ok?"covering":"trailing"} by ${dist}`}); return true;
   };
   recs.forEach(r=>{ if(check(r,r.playText)) recChanged=true; });
-  tk.forEach(t=>{ if(check(t,t.label)) tkChanged=true; });
+  tk.forEach(t=>{ if(t.parlay){ t.legs.forEach(l=>{ if(!l.sweated&&check(Object.assign(l,{graded:false}),`parlay leg ${l.label}`)) tkChanged=true; }); return; } if(check(t,t.label)) tkChanged=true; });
   if(recChanged) lsSet("edgeboard-record-v1",recs); if(tkChanged) saveTicket(tk);
 }
 function watchList(){   // live games where a board call or ticket item is within 10 points, 3rd quarter on
   const out=[]; const seen=new Set();
-  [...lsGet("edgeboard-record-v1",[]).filter(r=>!r.graded),...ticket().filter(t=>!t.graded)].forEach(r=>{
+  [...lsGet("edgeboard-record-v1",[]).filter(r=>!r.graded),...ticket().filter(t=>!t.graded).flatMap(t=>t.parlay?t.legs:[t])].forEach(r=>{
     const g=state.games.find(x=>x.id===r.gameId); if(!g||g.state!=="in"||seen.has(g.id)) return; const st=liveStatus(r); if(!st) return;
     const hs=Number(g.home.score),as=Number(g.away.score); const dist=r.type==="total"?Math.abs((hs+as)-r.lineTotal):Math.abs((hs-as)+r.lineSpread);
     if(dist<=10&&(g.period||0)>=3){ seen.add(g.id); out.push({g,r,st,dist}); } });
@@ -1238,9 +1278,13 @@ function renderTicket(){
   const t=ticket().slice().sort((a,b)=>(a.kickoff||0)-(b.kickoff||0));
   const today=new Date(); today.setHours(0,0,0,0);
   const settled=t.filter(x=>x.graded), open=t.filter(x=>!x.graded);
-  const pnlToday=settled.filter(x=>x.kickoff>=today.getTime()).reduce((a,x)=>a+(x.pnl||0),0), pnlAll=settled.reduce((a,x)=>a+(x.pnl||0),0);
+  const pnlToday=settled.filter(x=>(x.lastKick||x.kickoff)>=today.getTime()).reduce((a,x)=>a+(x.pnl||0),0), pnlAll=settled.reduce((a,x)=>a+(x.pnl||0),0);
   const w=settled.filter(x=>x.result==="win").length,l=settled.filter(x=>x.result==="loss").length; const risk=open.reduce((a,x)=>a+x.stake,0);
-  const row=x=>{ const g=state.games.find(y=>y.id===x.gameId); const live=g&&g.state==="in"; const st=live?ticketStatus(x):null;
+  const prow=x=>{ const rs=x.legs.map(gradeLeg); const anyLive=x.legs.some(l=>{const g=state.games.find(y=>y.id===l.gameId); return g&&g.state==="in";});
+    const badge=x.graded?`<span class="rbadge ${x.result==="win"?"win":x.result==="push"?"push":"loss"}">${x.result.toUpperCase()}${x.pnl?` ${x.pnl>0?"+":"−"}$${Math.abs(x.pnl)}`:""}</span>`:(anyLive?`<span class="rbadge ${rs.includes("loss")?"loss":"win"} live">LIVE · ${rs.filter(r=>r==="win").length}/${x.legs.length} legs in</span>`:`<span class="rbadge pend">${rs.filter(r=>r==="win").length}/${x.legs.length} legs · pending</span>`);
+    return `<div class="trow tk">${badge}<div class="tbody"><div class="tplay">🎰 ${x.legs.length}-leg parlay <span class="dim">@${x.price>0?"+":""}${x.price} · $${x.stake} to win $${Math.round(x.stake*(americanToDecimal(x.price)-1))}</span></div><div class="tsub">${parlayStatus(x)}${x.note?`<br><span class="dim">${x.note}</span>`:""}</div></div>
+      <div class="tkr">${x.graded?"":`<button class="tbtn tkrm" data-key="${x.key}" title="Remove">✕</button>`}</div></div>`; };
+  const row=x=>{ if(x.parlay) return prow(x); const g=state.games.find(y=>y.id===x.gameId); const live=g&&g.state==="in"; const st=live?ticketStatus(x):null;
     const badge=x.graded?`<span class="rbadge ${x.result==="win"?"win":x.result==="push"?"push":"loss"}">${x.result.toUpperCase()}${x.pnl?` ${x.pnl>0?"+":"−"}$${Math.abs(x.pnl)}`:""}</span>`:(st?`<span class="rbadge ${st.ok?"win":"loss"} live">LIVE · ${st.ok?"covering":"trailing"}</span>`:`<span class="rbadge pend">${g?fmtTime(g.date):"pending"}</span>`);
     const sub=x.graded?`Final ${x.awayAb} ${x.finalAway}–${x.finalHome} ${x.homeAb}`:(st?st.txt:(live?`${g.away.ab} ${g.away.score}–${g.home.score} ${g.home.ab} · ${g.short||""}`:`${x.name}`));
     return `<div class="trow tk">${badge}<div class="tbody"><div class="tplay">${x.label} <span class="dim">@${x.price>0?"+":""}${x.price}</span></div><div class="tsub">${sub}</div></div>
@@ -1255,7 +1299,18 @@ function renderTicket(){
     ${watch.length?`<div class="sech">🔥 Games to watch <span class="cnt">${watch.length} close late</span></div>${watch.map(x=>`<div class="trow watchrow"><span class="rbadge ${x.st.ok?"win":"loss"} live">${x.st.ok?"covering":"trailing"} by ${x.dist}</span><div class="tbody"><div class="tplay">${x.r.playText||x.r.label}</div><div class="tsub">${x.st.txt}</div></div></div>`).join("")}`:""}
     ${open.length?`<div class="sech">Open <span class="cnt">${open.length}</span></div>${open.map(row).join("")}`:'<div class="empty">Nothing on the ticket yet.<br><br><button class="tbtn" data-view="top">★ Go to Top Plays</button></div>'}
     ${settled.length?`<div class="sech" style="margin-top:18px">Settled <span class="cnt">${settled.length}</span></div>${settled.slice().reverse().map(row).join("")}`:""}
+    <details class="adv" style="margin-top:16px"><summary>➕ Add a parlay (your price — boosts welcome)</summary>
+      <div class="note" style="margin-top:8px">Pick 2–4 legs from this week's games, enter the odds your book gave you and the stake. Lines freeze now; it grades when every leg is final.</div>
+      ${[1,2,3,4].map(i=>`<select class="plsel" id="pl${i}" style="width:100%;margin:4px 0;background:var(--bg2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px"><option value="">— leg ${i}${i>2?" (optional)":""} —</option>${legOptions().map(o=>`<option value="${o.gameId}|${o.dir}">${o.label}</option>`).join("")}</select>`).join("")}
+      <div class="prow"><label class="dim">Odds <input type="number" id="plOdds" placeholder="+430" style="width:90px;background:var(--bg2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px"></label><label class="dim">Stake $ <input type="number" id="plStake" value="5" min="1" style="width:70px;background:var(--bg2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px"></label><button class="tbtn" id="plAdd">Add parlay</button><span class="dim" id="plMsg"></span></div>
+    </details>
     ${t.length?`<div class="prow"><button class="tbtn" id="tkClearSettled">Clear settled</button></div>`:""}`;
+  document.getElementById("plAdd")?.addEventListener("click",()=>{
+    const legs=[1,2,3,4].map(i=>document.getElementById("pl"+i)?.value).filter(Boolean).map(v=>{const [gameId,dir]=v.split("|"); return {gameId,dir};});
+    const odds=Number(document.getElementById("plOdds")?.value), stake=Math.max(1,Number(document.getElementById("plStake")?.value)||1);
+    if(legs.length<2||!odds){ document.getElementById("plMsg").textContent="pick at least two legs and enter the odds"; return; }
+    if(addParlay(legs,odds,stake)) renderTicket();
+  });
   box.querySelectorAll(".tkstake").forEach(el=>el.addEventListener("change",e=>{ const tt=ticket(); const it=tt.find(x=>x.key===e.target.dataset.key); if(it){ it.stake=Math.max(1,Number(e.target.value)||1); saveTicket(tt); renderTicket(); } }));
   box.querySelectorAll(".tkrm").forEach(el=>el.addEventListener("click",e=>{ removeFromTicket(e.currentTarget.dataset.key); renderTicket(); }));
   document.getElementById("tkClearSettled")?.addEventListener("click",()=>{ saveTicket(ticket().filter(x=>!x.graded)); renderTicket(); });
