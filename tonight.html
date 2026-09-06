@@ -12,12 +12,12 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}th,td{pa
 .note{color:var(--dim);font-size:12px;margin-top:10px}
 </style></head><body>
 <h1>🎟 Tonight's Slip</h1><div class="sub" id="upd">connecting…</div>
-<div class="kpis"><div class="k"><b id="risk">$0</b><span>at risk</span></div><div class="k"><b id="pnl">$0</b><span>settled P&amp;L</span></div><div class="k"><b id="proj">$0</b><span>if it ended now</span></div></div>
+<div class="kpis"><div class="k"><b id="risk">$0</b><span>at risk</span></div><div class="k"><b id="pnl">$0</b><span>settled P&amp;L</span></div><div class="k"><b id="proj">$0</b><span>if it ended now*</span></div></div>
 <div id="games"></div>
 <div id="tickets"></div>
 <h3 style="margin:16px 0 4px;font-size:15px">Profit by outcome <span class="dim" style="font-weight:400;font-size:12px">(profit on top of stakes returned)</span></h3>
 <table id="scen"></table>
-<div class="note">Scores from ESPN every 15s. "If it ended now" grades every leg on the current score. The +numbers on your books are profit — you also get the stake back.</div>
+<div class="note">Scores from ESPN every 15s. "If it ended now" grades the games that have kicked off on the current score (tickets waiting on Ole Miss are excluded until 7:30). The +numbers on your books are profit — you also get the stake back.</div>
 <script>
 const API=/^https?:$/.test(location.protocol)?"/api":null;
 const G={wsu:"401858437",miss:"401856661"};
@@ -61,7 +61,7 @@ function render(){
   let risk=0,settled=0,proj=0;
   document.getElementById("tickets").innerHTML=TICKETS.map(t=>{ const {status,ev}=ticketEval(t); risk+=t.stake;
     if(status==="win") settled+=t.profit; else if(status==="loss") settled-=t.stake;
-    const nowWin=ev.every(e=>e.res==="win"||e.ok===true); proj+=nowWin?t.profit:-t.stake;
+    const started=ev.every(e=>e.res!=null||e.ok!=null); if(started){ const nowWin=ev.every(e=>e.res==="win"||e.ok===true); proj+=nowWin?t.profit:-t.stake; }
     const badge=status==="win"?`WIN ${money(t.profit)}`:status==="loss"?`LOSS ${money(-t.stake)}`:status==="track"?"ON TRACK":"OPEN";
     return `<div class="tk ${status}"><div class="th"><b>${t.book} · ${t.name}</b><span class="badge ${status}">${badge}</span></div><div class="dim" style="font-size:12px">$${t.stake.toFixed(2)} to win $${t.profit.toFixed(2)}</div>
       <div class="legs">${t.legs.map((l,i)=>`<div class="leg"><span>${l.kind==="spread"?`${l.team} ${l.line>0?"+":""}${l.line}`:l.kind==="total"?`${l.dir} ${l.line}`:l.kind==="passyds"?`${l.player} ${l.line}+ pass yds`:`${l.player} anytime TD`}<div class="dim">${ev[i].txt}</div></span><span class="s ${ev[i].res==="win"||ev[i].ok===true?"pos":ev[i].res==="loss"||ev[i].ok===false?"neg":"dim"}">${ev[i].res?ev[i].res.toUpperCase():ev[i].ok==null?"…":ev[i].ok?"✓":"✗"}</span></div>`).join("")}</div></div>`; }).join("");
