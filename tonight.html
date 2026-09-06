@@ -1,0 +1,79 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tonight's Slip</title>
+<style>
+:root{--bg:#0a0e14;--panel:#111826;--bg2:#182233;--line:#243044;--ink:#e8edf5;--dim:#8a97ab;--green:#3ddc84;--red:#ff5d5d;--amber:#f5b942}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,-apple-system,sans-serif;padding:14px 12px 40px}
+h1{font-size:22px;margin:0 0 2px}.sub{color:var(--dim);font-size:12px;margin-bottom:12px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.k{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px;text-align:center}.k b{display:block;font-size:22px;font-family:ui-monospace,monospace}.k span{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.game{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}.game .t{display:flex;justify-content:space-between;align-items:center}.sc{font-family:ui-monospace,monospace;font-size:24px;font-weight:800}.st{color:var(--amber);font-weight:700;font-size:13px}.meta{color:var(--dim);font-size:12px;margin-top:4px}
+.tk{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}.tk.win{border-color:var(--green)}.tk.loss{border-color:var(--red);opacity:.8}.tk.track{border-color:var(--amber)}
+.th{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.th b{font-size:15px}.badge{font-size:11px;font-weight:800;padding:3px 8px;border-radius:7px;background:var(--bg2);border:1px solid var(--line)}.badge.win{color:var(--green);border-color:var(--green)}.badge.loss{color:var(--red);border-color:var(--red)}.badge.track{color:var(--amber);border-color:var(--amber)}
+.legs{margin-top:8px;font-size:13px}.leg{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px dashed var(--line)}.leg .s{white-space:nowrap;font-weight:700}.pos{color:var(--green)}.neg{color:var(--red)}.dim{color:var(--dim)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line)}th{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.06em}td.n{text-align:right;font-family:ui-monospace,monospace;font-weight:700}tr.now{background:rgba(245,185,66,.12)}
+.note{color:var(--dim);font-size:12px;margin-top:10px}
+</style></head><body>
+<h1>🎟 Tonight's Slip</h1><div class="sub" id="upd">connecting…</div>
+<div class="kpis"><div class="k"><b id="risk">$0</b><span>at risk</span></div><div class="k"><b id="pnl">$0</b><span>settled P&amp;L</span></div><div class="k"><b id="proj">$0</b><span>if it ended now</span></div></div>
+<div id="games"></div>
+<div id="tickets"></div>
+<h3 style="margin:16px 0 4px;font-size:15px">Profit by outcome <span class="dim" style="font-weight:400;font-size:12px">(profit on top of stakes returned)</span></h3>
+<table id="scen"></table>
+<div class="note">Scores from ESPN every 15s. "If it ended now" grades every leg on the current score. The +numbers on your books are profit — you also get the stake back.</div>
+<script>
+const API=/^https?:$/.test(location.protocol)?"/api":null;
+const G={wsu:"401858437",miss:"401856661"};
+const TICKETS=[
+ {book:"DK",name:"Ole Miss -6.5 (-115)",stake:88.74,profit:77.16,legs:[{g:"miss",kind:"spread",team:"MISS",line:-6.5}]},
+ {book:"DK",name:"Parlay +430 (boosted)",stake:25,profit:107.50,legs:[{g:"wsu",kind:"spread",team:"WSU",line:23.5},{g:"miss",kind:"total",dir:"UNDER",line:54.5}]},
+ {book:"DK",name:"Parlay +855 (boosted)",stake:10,profit:85.50,legs:[{g:"wsu",kind:"spread",team:"WSU",line:23.5},{g:"miss",kind:"spread",team:"MISS",line:-6.5},{g:"miss",kind:"total",dir:"UNDER",line:55.5}]},
+ {book:"FD",name:"Ole Miss -6.5 (+111 boost)",stake:10,profit:11.10,legs:[{g:"miss",kind:"spread",team:"MISS",line:-6.5}]},
+ {book:"FD",name:"SGP +4958",stake:5,profit:247.92,legs:[{g:"miss",kind:"spread",team:"MISS",line:-6.5},{g:"miss",kind:"passyds",player:"Chambliss",line:300},{g:"miss",kind:"total",dir:"UNDER",line:55.5},{g:"miss",kind:"td",player:"Lacy"},{g:"miss",kind:"td",player:"Brown"}]}
+];
+const S={};
+async function jget(u){ if(API){ try{ const r=await fetch(`${API}/espn?u=${encodeURIComponent(u)}`,{cache:"no-store"}); if(r.ok){ const b=await r.json(); if(b&&!b.error) return b; } }catch(e){} } const r=await fetch(u,{cache:"no-store"}); return r.json(); }
+function parse(d){
+  const c=d.header.competitions[0]; const cs=c.competitors; const home=cs.find(x=>x.homeAway==="home"), away=cs.find(x=>x.homeAway==="away");
+  const st=c.status; const state=st.type.state; const period=st.period||0; const clock=st.clock||0;
+  const elapsed=state==="post"?3600:Math.min(3600,(Math.max(1,period)-1)*900+(900-clock));
+  const pass={}; (d.boxscore?.players||[]).forEach(t=>(t.statistics||[]).filter(s=>s.name==="passing").forEach(s=>(s.athletes||[]).forEach(a=>{ pass[a.athlete.displayName]=Number(a.stats[1]||0); })));
+  const tds=(d.scoringPlays||[]).filter(p=>/for a TD/i.test(p.text||"")).map(p=>p.text);
+  return {state,short:st.type.shortDetail,period,clock,home:{ab:home.team.abbreviation,score:Number(home.score||0)},away:{ab:away.team.abbreviation,score:Number(away.score||0)},elapsed,pass,tds,name:`${away.team.abbreviation} @ ${home.team.abbreviation}`};
+}
+function legEval(l){
+  const g=S[l.g]; if(!g) return {res:null,txt:"loading"};
+  const fin=g.state==="post"; const pre=g.state==="pre";
+  if(pre) return {res:null,txt:"7:30 PM",ok:null};
+  const hs=g.home.score,as=g.away.score,tot=hs+as;
+  if(l.kind==="spread"){ const mine=l.team===g.home.ab?hs:as, theirs=l.team===g.home.ab?as:hs; const cm=(mine-theirs)+l.line; const ok=cm>0; return {res:fin?(cm===0?"push":ok?"win":"loss"):null,ok,txt:`${g.away.ab} ${as}–${hs} ${g.home.ab} · ${ok?"covering":"behind"} by ${Math.abs(cm)}`}; }
+  if(l.kind==="total"){ const frac=Math.min(.92,Math.max(.12,g.elapsed/3600)); const pace=fin?tot:tot/frac; const ok=l.dir==="UNDER"?pace<l.line:pace>l.line; return {res:fin?(tot===l.line?"push":((tot<l.line)===(l.dir==="UNDER"))?"win":"loss"):null,ok,txt:`${tot} pts${fin?"":` · pace ~${pace.toFixed(0)}`} vs ${l.line}`}; }
+  if(l.kind==="passyds"){ const k=Object.keys(g.pass).find(n=>n.includes(l.player)); const y=k?g.pass[k]:0; const ok=y>=l.line; return {res:fin?(ok?"win":"loss"):null,ok,txt:`${k||l.player}: ${y} yds vs ${l.line}+`}; }
+  if(l.kind==="td"){ const hit=g.tds.some(t=>t.includes(l.player)); return {res:hit?"win":(fin?"loss":null),ok:hit,txt:hit?`${l.player} scored ✓`:`${l.player}: no TD yet`}; }
+}
+function ticketEval(t){
+  const ev=t.legs.map(legEval);
+  if(ev.some(e=>e.res==="loss")) return {status:"loss",ev};
+  if(ev.every(e=>e.res==="win"||e.res==="push")) return {status:"win",ev};
+  const any=ev.some(e=>e.ok!=null); const track=any&&ev.every(e=>e.res==="win"||e.ok===true||e.ok==null&&e.res==null&&S[t.legs[ev.indexOf(e)].g]?.state==="pre");
+  return {status:track?"track":"open",ev};
+}
+function money(x){ return (x<0?"−":"+")+"$"+Math.abs(x).toFixed(2); }
+function render(){
+  document.getElementById("games").innerHTML=Object.entries(G).map(([k])=>{ const g=S[k]; if(!g) return ""; return `<div class="game"><div class="t"><div><b>${g.away.ab}</b> @ <b>${g.home.ab}</b><div class="meta">${g.state==="pre"?"Kicks 7:30 PM ET · Nashville":g.short}</div></div><div style="text-align:right"><div class="sc">${g.state==="pre"?"—":`${g.away.score}–${g.home.score}`}</div><div class="st">${g.state==="in"?"● LIVE":g.state==="post"?"FINAL":""}</div></div></div></div>`; }).join("");
+  let risk=0,settled=0,proj=0;
+  document.getElementById("tickets").innerHTML=TICKETS.map(t=>{ const {status,ev}=ticketEval(t); risk+=t.stake;
+    if(status==="win") settled+=t.profit; else if(status==="loss") settled-=t.stake;
+    const nowWin=ev.every(e=>e.res==="win"||e.ok===true); proj+=nowWin?t.profit:-t.stake;
+    const badge=status==="win"?`WIN ${money(t.profit)}`:status==="loss"?`LOSS ${money(-t.stake)}`:status==="track"?"ON TRACK":"OPEN";
+    return `<div class="tk ${status}"><div class="th"><b>${t.book} · ${t.name}</b><span class="badge ${status}">${badge}</span></div><div class="dim" style="font-size:12px">$${t.stake.toFixed(2)} to win $${t.profit.toFixed(2)}</div>
+      <div class="legs">${t.legs.map((l,i)=>`<div class="leg"><span>${l.kind==="spread"?`${l.team} ${l.line>0?"+":""}${l.line}`:l.kind==="total"?`${l.dir} ${l.line}`:l.kind==="passyds"?`${l.player} ${l.line}+ pass yds`:`${l.player} anytime TD`}<div class="dim">${ev[i].txt}</div></span><span class="s ${ev[i].res==="win"||ev[i].ok===true?"pos":ev[i].res==="loss"||ev[i].ok===false?"neg":"dim"}">${ev[i].res?ev[i].res.toUpperCase():ev[i].ok==null?"…":ev[i].ok?"✓":"✗"}</span></div>`).join("")}</div></div>`; }).join("");
+  document.getElementById("risk").textContent="$"+risk.toFixed(2); const p=document.getElementById("pnl"); p.textContent=money(settled); p.className=settled>=0?"pos":"neg"; const q=document.getElementById("proj"); q.textContent=money(proj); q.className=proj>=0?"pos":"neg";
+  // scenarios: WSU assumed to hold unless it has lost; props only in the best case
+  const wsuLost=legEval({g:"wsu",kind:"spread",team:"WSU",line:23.5}).res==="loss";
+  const rows=[["Best case — everything incl. the props",true,true,true],["Ole Miss covers · UNDER",true,true,false],["Ole Miss covers · OVER",true,false,false],["Ole Miss fails · UNDER",false,true,false],["Ole Miss fails · OVER",false,false,false]];
+  const prof=(om,un,props)=>TICKETS.reduce((a,t)=>{ const ok=t.legs.every(l=>l.g==="wsu"?!wsuLost:l.kind==="spread"?om:l.kind==="total"?un:props); return a+(ok?t.profit:-t.stake); },0);
+  const gm=S.miss; let cur=null; if(gm&&gm.state!=="pre"){ const om=legEval({g:"miss",kind:"spread",team:"MISS",line:-6.5}).ok, un=legEval({g:"miss",kind:"total",dir:"UNDER",line:54.5}).ok; cur=rows.findIndex((r,i)=>i>0&&r[1]===om&&r[2]===un); }
+  document.getElementById("scen").innerHTML=`<tr><th>Outcome</th><th style="text-align:right">Profit</th></tr>`+rows.map((r,i)=>`<tr class="${i===cur?"now":""}"><td>${r[0]}${i===cur?' <span class="dim">← tracking now</span>':""}</td><td class="n ${prof(r[1],r[2],r[3])>=0?"pos":"neg"}">${money(prof(r[1],r[2],r[3]))}</td></tr>`).join("");
+  document.getElementById("upd").textContent=`updated ${new Date().toLocaleTimeString()} · WSU leg ${wsuLost?"LOST":(S.wsu&&S.wsu.state==="post"?"WON ✓":"live")}`;
+}
+async function tick(){ try{ const [a,b]=await Promise.all(Object.values(G).map(id=>jget(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=${id}`))); S.wsu=parse(a); S.miss=parse(b); render(); }catch(e){ document.getElementById("upd").textContent="feed error — retrying"; } }
+tick(); setInterval(tick,15000);
+</script></body></html>
