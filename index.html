@@ -590,11 +590,17 @@ async function loadSlate(){
   const {mon,sun}=weekWindow();
   document.getElementById("winLabel").innerHTML=
     `${mon.toLocaleDateString(undefined,{month:"short",day:"numeric"})} – ${sun.toLocaleDateString(undefined,{month:"short",day:"numeric"})}<small>Betting week</small>`;
-  const range=`${ymd(mon)}-${ymd(sun)}`;
+  // ESPN's date range END is exclusive (it stops at 00:00Z of the end day), which was
+  // silently dropping every Sunday game. Ask for two extra days and trim to the betting
+  // week ourselves by local kickoff time.
+  const fetchEnd=new Date(sun); fetchEnd.setDate(fetchEnd.getDate()+2);
+  const sunEnd=new Date(sun); sunEnd.setHours(23,59,59,999);
+  const range=`${ymd(mon)}-${ymd(fetchEnd)}`;
+  const inWeek=e=>{ const t=new Date(e.date); return t>=mon&&t<=sunEnd; };
   const out=[];
   const jobs=[
-    jget(`${NFL}/scoreboard?dates=${range}&limit=100`).then(d=>{ if(d.week?.number) state.wk.nfl=d.week.number; (d.events||[]).forEach(e=>out.push(parseGame(e,"nfl"))); }).catch(()=>{}),
-    jget(`${CFB}/scoreboard?groups=80&dates=${range}&limit=400`).then(d=>{ if(d.week?.number) state.wk.cfb=d.week.number; (d.events||[]).forEach(e=>out.push(parseGame(e,"cfb"))); }).catch(()=>{})
+    jget(`${NFL}/scoreboard?dates=${range}&limit=100`).then(d=>{ if(d.week?.number) state.wk.nfl=d.week.number; (d.events||[]).filter(inWeek).forEach(e=>out.push(parseGame(e,"nfl"))); }).catch(()=>{}),
+    jget(`${CFB}/scoreboard?groups=80&dates=${range}&limit=400`).then(d=>{ if(d.week?.number) state.wk.cfb=d.week.number; (d.events||[]).filter(inWeek).forEach(e=>out.push(parseGame(e,"cfb"))); }).catch(()=>{})
   ];
   await Promise.all(jobs);
   // if a league has nothing this window, pull its next games so the board isn't blank
