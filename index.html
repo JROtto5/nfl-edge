@@ -586,6 +586,22 @@ function parseGame(e,lg){
   };
 }
 
+/* ESPN started rejecting college date-RANGE scoreboard queries (HTTP 400 "Failed to get
+   events endpoint", first seen 2026-09-17 — single dates and week= still answer, and NFL
+   ranges still work). The old code swallowed that error, so college silently vanished from
+   the board. Try the range first; if it fails, rebuild it from week queries. Callers already
+   trim by kickoff time, so extra events from neighbouring weeks are harmless. */
+async function scoreboardRange(base,range,limit,extra,wholeSeason){
+  extra=extra||"";
+  try{ const d=await jget(`${base}/scoreboard?dates=${range}&limit=${limit}${extra}`); if(d&&Array.isArray(d.events)) return d; }catch(e){}
+  const cur=await jget(`${base}/scoreboard?limit=${limit}${extra}`);   // no dates = ESPN's current week
+  const wk=cur.week?.number||1;
+  const weeks=[]; for(let w=wholeSeason?1:Math.max(1,wk-1); w<=wk+(wholeSeason?0:1); w++) if(w!==wk) weeks.push(w);
+  const more=await jgetMany(weeks.map(w=>`${base}/scoreboard?week=${w}&seasontype=2&limit=${limit}${extra}`));
+  const seen=new Set(), events=[];
+  [cur,...more].forEach(d=>((d&&d.events)||[]).forEach(e=>{ if(!seen.has(e.id)){ seen.add(e.id); events.push(e); } }));
+  return {week:cur.week,season:cur.season,events,rangeFallback:true};
+}
 async function loadSlate(){
   const {mon,sun}=weekWindow();
   document.getElementById("winLabel").innerHTML=
@@ -599,8 +615,8 @@ async function loadSlate(){
   const inWeek=e=>{ const t=new Date(e.date); return t>=mon&&t<=sunEnd; };
   const out=[];
   const jobs=[
-    jget(`${NFL}/scoreboard?dates=${range}&limit=100`).then(d=>{ if(d.week?.number) state.wk.nfl=d.week.number; (d.events||[]).filter(inWeek).forEach(e=>out.push(parseGame(e,"nfl"))); }).catch(()=>{}),
-    jget(`${CFB}/scoreboard?groups=80&dates=${range}&limit=400`).then(d=>{ if(d.week?.number) state.wk.cfb=d.week.number; (d.events||[]).filter(inWeek).forEach(e=>out.push(parseGame(e,"cfb"))); }).catch(()=>{})
+    scoreboardRange(NFL,range,100,"").then(d=>{ if(d.week?.number) state.wk.nfl=d.week.number; (d.events||[]).filter(inWeek).forEach(e=>out.push(parseGame(e,"nfl"))); }).catch(()=>{}),
+    scoreboardRange(CFB,range,400,"&groups=80").then(d=>{ if(d.week?.number) state.wk.cfb=d.week.number; (d.events||[]).filter(inWeek).forEach(e=>out.push(parseGame(e,"cfb"))); }).catch(()=>{})
   ];
   await Promise.all(jobs);
   // if a league has nothing this window, pull its next games so the board isn't blank
@@ -800,7 +816,7 @@ async function loadSeasonResults(){
   const out=[];
   const grab=async(base,lg,extra)=>{
     try{
-      const d=await jget(`${base}/scoreboard?dates=${start}-${end}&limit=900${extra||""}`);
+      const d=await scoreboardRange(base,`${start}-${end}`,900,extra,true);
       (d.events||[]).forEach(e=>{
         const c=(e.competitions||[])[0]||{};
         if((c.status?.type?.state)!=="post") return;
