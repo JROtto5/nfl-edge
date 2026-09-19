@@ -3,7 +3,7 @@
    grading, alerts — so the server record can never disagree with what a viewer saw.
    The engine's localStorage is seeded from the stored document and read back after. */
 const fs=require("fs"),path=require("path"),vm=require("vm");
-const {fetchOne}=require("./_espn.js");
+const {fetchOne,fetchDetail}=require("./_espn.js");
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function loadScript(){
   let html=null;
@@ -21,8 +21,11 @@ async function runEngine({records=[],alerts=[],pastOU={},timeoutMs=40000}={}){
   const els={}; const doc={getElementById:id=>els[id]||(els[id]=new El()),addEventListener(){},querySelectorAll:()=>[],querySelector:()=>null,documentElement:new El(),createElement:()=>new El(),body:new El(),hidden:false};
   const ls={"edgeboard-record-v1":JSON.stringify(records),"edgeboard-alerts-v1":JSON.stringify(alerts),"edgeboard-pastou-v1":JSON.stringify(pastOU),"edgeboard-record-migr":"1","edgeboard-intro-read":"1"};
   const fakeFetch=async(u,o)=>{
-    if(typeof u==="string"&&u.startsWith("/api/espn")){ const t=decodeURIComponent(u.split("u=")[1]); const b=await fetchOne(t); return {ok:!!b,status:b?200:502,json:async()=>b??{error:1}}; }
-    if(typeof u==="string"&&u.startsWith("/api/bulk")){ const urls=JSON.parse(o.body).urls; const res=await Promise.all(urls.map(fetchOne)); return {ok:true,status:200,json:async()=>({results:res})}; }
+    // headers must be present: the page reads X-Edge-Reason off a failed proxy call
+    const hdrs=h=>({get:k=>h[k.toLowerCase()]??null});
+    if(typeof u==="string"&&u.startsWith("/api/espn")){ const t=decodeURIComponent(u.split("u=")[1]); const {body,status,reason}=await fetchDetail(t);
+      return {ok:!!body,status:body?200:502,headers:hdrs({"x-edge-reason":reason||"",...(body&&body._edge?{"x-edge-source":body._edge.src}:{})}),json:async()=>body??{error:"upstream failed",upstream:status,reason}}; }
+    if(typeof u==="string"&&u.startsWith("/api/bulk")){ const urls=JSON.parse(o.body).urls; const res=await Promise.all(urls.map(fetchOne)); return {ok:true,status:200,headers:hdrs({}),json:async()=>({results:res})}; }
     return fetch(u,o);
   };
   const sb={document:doc,fetch:fakeFetch,localStorage:{getItem:k=>ls[k]??null,setItem:(k,v)=>{ls[k]=v;},removeItem:k=>{delete ls[k];}},

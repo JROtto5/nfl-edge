@@ -20,7 +20,11 @@ those calls actually did.
   matchup model, with injury adjustments; edge vs the market shown per game.
 - **Stake sizing** — each strong play gets an estimated hit probability from the
   best evidence available and a quarter-Kelly stake against your bankroll.
-- **🏆 Best bets of the week** sort, ★ Top Plays, Props (directional), Parlay Builder.
+- **🏆 Best Bets** — its own view: the plays that clear the bar, split NFL / college,
+  each one showing the number behind it, the sample that number came from, the market
+  price and which book set it. It says **"nothing worth betting"** when nothing qualifies
+  rather than ranking the least-bad options. Plus the Best bets sort, ★ Top Plays,
+  Props (directional), Parlay Builder.
 - **Track Record** — every strong call is logged the moment it appears with the line
   frozen, graded when the game goes final, with closing-line value, a per-signal
   self-audit, fade detection, and live covering/trailing status for open calls.
@@ -61,14 +65,22 @@ failed and are not shipped.
 index.html          single-file app (state, signals, projections, views)
 intro.html          45s animated intro, Web Audio synthesized music
 sw.js               PWA service worker: page network-first, ESPN + /api never cached
-api/_espn.js        server-side ESPN fetcher, allow-listed hosts, ~20s memory cache
+api/_espn.js        server-side ESPN fetcher: allow-listed hosts, ~10s memory cache,
+                    limit clamped to ESPN's real max of 500, and dead `dates=A-B`
+                    scoreboard ranges rebuilt day-by-day
 api/espn.js         GET  /api/espn?u=<espn url>     single proxied call, CDN-cached
 api/bulk.js         POST /api/bulk {urls:[...]}     one round-trip per batch of games
+scripts/selftest.js dev: runs the page in a Node vm against live ESPN and asserts
+scripts/dev-server.js  dev: static files + the real /api handlers on localhost
 manifest.webmanifest, icon-*.png
 ```
 
-The client routes all ESPN traffic through `/api` when served over http(s) and falls
-back to calling ESPN directly if the API is unavailable, so a static copy still works.
+**All ESPN traffic must go through `/api`.** ESPN's Akamai edge answers browser-shaped
+cross-origin requests (real user-agent + `Origin` + `Sec-Fetch-*`) with **403 and no
+`Access-Control-Allow-Origin`**, so the old client-side "fall back to calling ESPN
+directly" path fails CORS every time and a purely static copy no longer loads data.
+Every repair for a changed upstream shape belongs in `api/_espn.js`, and a failure
+there is reported — never turned into an empty list.
 
 Data sources: `site.api.espn.com` scoreboard + summary (odds, weather, injuries,
 predictor, last-five, pickcenter), `sports.core.api.espn.com` odds (keeps the
@@ -81,6 +93,17 @@ There is no build step. Signals are tested by running the page's script in a Nod
 `vm` sandbox against captured ESPN JSON (real slates, real live-odds payloads) plus
 synthetic known-answer scenarios, and the API handlers are called directly in Node.
 No debug hooks are ever shipped — `grep -c __DBG index.html` must be `0` before deploy.
+
+```
+node scripts/selftest.js          # runs the page in a vm against live ESPN, asserts
+node scripts/dev-server.js        # http://localhost:4399 with the real /api handlers
+FAIL=cfb node scripts/dev-server.js   # inject a league feed outage to check it's visible
+```
+
+`selftest.js` covers the failures that have actually happened: the dead date-range
+query, ESPN's silent 500-event `limit` ceiling, both leagues reaching the board, a
+fabricated empty feed being reported instead of shown as "no games", and Best Bets
+being willing to say nothing.
 
 ## Deploy
 

@@ -20,6 +20,9 @@
       "maxDuration": 60,
       "includeFiles": "index.html"
     },
+    "api/espn.js": {
+      "maxDuration": 30
+    },
     "api/record.js": {
       "maxDuration": 10
     },

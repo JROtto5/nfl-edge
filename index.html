@@ -162,6 +162,9 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .cbact{margin-top:6px}.betbtn{font-weight:800}.betbtn.on{border-color:var(--green);color:var(--green)}
 .trow.tk .tkr{display:flex;gap:6px;align-items:center;margin-left:auto}.tkstake{background:var(--bg2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-family:inherit}
 .watchbar{background:var(--panel);border:1px solid var(--amber);border-radius:11px;padding:9px 12px;font-size:13px;margin-bottom:10px}
+.feedwarn{background:var(--panel);border:1px solid var(--red);border-left:4px solid var(--red);border-radius:11px;padding:10px 13px;font-size:13px;margin-bottom:12px;color:var(--ink)}
+.feedwarn b{color:var(--red)}
+.feedwarn code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;color:var(--dim);word-break:break-word}
 .trow.watchrow{border-color:var(--amber)}
 .catchip.sweat{border-color:var(--red);color:var(--red)}.catchip.ticket{border-color:var(--green);color:var(--green)}
 .callbox.strongcut .cb1{font-size:15px}
@@ -210,6 +213,29 @@ main{max-width:1360px;margin:0 auto;padding:16px 18px 70px}
 .intro summary::after{content:" ▸";color:var(--dim)}
 .intro[open] summary::after{content:" ▾"}
 .toprow.watch{opacity:.85;border-style:dashed}
+/* ---- Best Bets ---- */
+.bbrow{align-items:flex-start}
+.bbrow .topnum{line-height:1.15}
+.bbbasis{margin-top:7px;font-size:12.5px;line-height:1.5;color:var(--ink)}
+.bbbasis>div{padding:2px 0}
+.bbbasis b{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.bbk{display:inline-block;min-width:66px;font-size:9.5px;font-weight:700;letter-spacing:.07em;
+     text-transform:uppercase;color:var(--mute);margin-right:6px;vertical-align:1px}
+.bbwhy{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
+.bbwhy summary{cursor:pointer;list-style:none;font-size:11.5px;font-weight:700;letter-spacing:.04em;
+               text-transform:uppercase;color:var(--dim);user-select:none}
+.bbwhy summary::-webkit-details-marker{display:none}
+.bbwhy summary::before{content:"▸ "}
+.bbwhy[open] summary::before{content:"▾ "}
+.bbsig{margin-top:9px;padding-left:10px;border-left:2px solid var(--line)}
+.bbsigh{font-size:12.5px}
+.bbsigp{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.5}
+.bbsigw{font-size:11.5px;color:var(--dim);margin-top:4px;line-height:1.5}
+.bbsigp b,.bbsigw b{color:var(--ink)}
+.bbnone{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--cyan);
+        border-radius:11px;padding:13px 15px;font-size:13.5px;line-height:1.55;color:var(--ink);margin-bottom:9px}
+.bbnone b{color:var(--ink)}
+.alsolist{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-top:1px dashed var(--line);border-radius:11px;padding:10px 14px}
 .strip .cap{display:block;font-size:10px;color:var(--amber);margin-top:2px}
 .strip{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
 .strip>div{flex:1 1 120px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:12.5px;color:var(--dim);text-align:center}
@@ -315,6 +341,11 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
   .toprow{padding:11px 12px;gap:10px}
   .topplay{font-size:14px}
   .topnum{font-size:21px;width:22px}
+  .bbrow{gap:8px}
+  .bbbasis{font-size:12px}
+  .bbk{display:block;min-width:0;margin:2px 0 0}
+  .bbnone{padding:11px 12px;font-size:12.5px}
+  .bottomnav button{font-size:11px;padding:8px 1px}
   .grid-wrap,.lines{max-width:100%}
   footer{padding:0 12px 34px}
 }
@@ -343,6 +374,7 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
   <div class="bar">
     <div class="seg" id="viewSeg">
       <button data-view="board" data-on="1">Board</button>
+      <button data-view="best">🏆 Best Bets</button>
       <button data-view="top">★ Top Plays</button>
       <button data-view="props">Props</button>
       <button data-view="track">Results</button>
@@ -369,11 +401,12 @@ footer{max-width:1360px;margin:0 auto;padding:0 18px 40px;color:var(--mute);font
 </header>
 <div id="modal" class="modal" hidden></div>
 <nav class="bottomnav" id="bottomNav">
-  <button data-view="board">Board</button><button data-view="top">★ Top</button><button data-view="ticket">🎟 Ticket</button><button data-view="track">Results</button><button data-view="alerts">🔔</button>
+  <button data-view="board">Board</button><button data-view="best">🏆 Bets</button><button data-view="top">★ Top</button><button data-view="ticket">🎟 Ticket</button><button data-view="track">Results</button><button data-view="alerts">🔔</button>
 </nav>
 
 <main>
   <details class="note intro" id="introNote"><summary><b>How to read this</b></summary><div style="margin-top:8px">Each card leads with <b>the call</b>: bet this side, this much, or no bet. A call only appears when a play is <b>STRONG</b> — hard evidence (a QB ruled out, real line movement, a live pace gap, 25+ mph gusts backed by a second signal) or several weighted signals agreeing. Leans are shown as chips so you can see what's brewing, but they are never a bet. Stakes are quarter-Kelly on your bankroll. Reference only — nothing here places a bet, and never bet what you can't afford to lose.</div></details>
+  <div id="feedWarn" class="feedwarn" hidden></div>
   <div id="board"><div class="empty"><span class="spin"></span> Loading this week's slate…</div></div>
 </main>
 
@@ -532,14 +565,30 @@ function applyLineMovement(games,weekKey){
 const API=(typeof location!=="undefined"&&/^https?:$/.test(location.protocol))?"/api":null;
 let apiDown=false;
 async function jget(u){
+  // Keep the server's explanation. The direct-ESPN attempt below cannot succeed from a
+  // browser any more — ESPN's edge answers browser-shaped cross-origin requests with a
+  // 403 carrying no Access-Control-Allow-Origin — so its "Failed to fetch" is noise.
+  // The proxy's reason is the one that actually says what broke.
+  let apiReason=null, apiAnswered=false;
   if(API&&!apiDown){
     try{
       const r=await fetch(`${API}/espn?u=${encodeURIComponent(u)}`,{cache:"no-store"});
-      if(r.ok){ const b=await r.json(); if(b&&!b.error) return b; }
-      else if(r.status===404) apiDown=true;
-    }catch(e){ apiDown=true; }
+      apiAnswered=r.status!==404;
+      if(r.ok){ const b=await r.json(); if(b&&!b.error) return b; apiReason=(b&&b.reason)||"proxy answered with an error body"; }
+      else{
+        if(r.status===404) apiDown=true;
+        apiReason=(r.headers&&r.headers.get&&r.headers.get("X-Edge-Reason"))||`proxy HTTP ${r.status}`;
+        try{ const b=await r.json(); if(b&&b.reason) apiReason=b.reason; }catch(e){}
+      }
+    }catch(e){ apiDown=true; apiReason=`proxy unreachable: ${(e&&e.message)||e}`; }
   }
-  const r=await fetch(u,{cache:"no-store"}); if(!r.ok) throw new Error(r.status); return r.json();
+  // If the proxy answered and said no, stop. Retrying from the browser cannot work —
+  // ESPN's edge 403s a browser-shaped cross-origin request with no CORS header — and
+  // the attempt only replaces the server's real reason with "Failed to fetch".
+  if(apiAnswered) throw new Error(apiReason||"proxy declined");
+  try{
+    const r=await fetch(u,{cache:"no-store"}); if(!r.ok) throw new Error(`ESPN HTTP ${r.status}`); return r.json();
+  }catch(e){ throw new Error(apiReason||`direct ESPN fetch failed: ${(e&&e.message)||e}`); }
 }
 async function jgetMany(urls){
   if(API&&!apiDown&&urls.length){
@@ -572,6 +621,8 @@ function parseGame(e,lg){
     home:{ab:home.team?.abbreviation||"?",nm:home.team?.shortDisplayName||"",logo:home.team?.logo,rec:(home.records||[])[0]?.summary||"",score:home.score,id:home.team?.id,rank:home.curatedRank?.current,conf:home.team?.conferenceId!=null?Number(home.team.conferenceId):null},
     away:{ab:away.team?.abbreviation||"?",nm:away.team?.shortDisplayName||"",logo:away.team?.logo,rec:(away.records||[])[0]?.summary||"",score:away.score,id:away.team?.id,rank:away.curatedRank?.current,conf:away.team?.conferenceId!=null?Number(away.team.conferenceId):null},
     spread:o?o.spread:null, details:o?o.details:null, total:o?o.overUnder:null,
+    book:o?.provider?.name||null,          // which book ESPN's scoreboard number came from
+
     mlHome:o?.moneyline?.home?.close?.odds||o?.homeTeamOdds?.moneyLine||null,
     mlAway:o?.moneyline?.away?.close?.odds||o?.awayTeamOdds?.moneyLine||null,
     favAb:o?(o.homeTeamOdds?.favorite?home.team?.abbreviation:away.team?.abbreviation):null,
@@ -586,21 +637,36 @@ function parseGame(e,lg){
   };
 }
 
-/* ESPN started rejecting college date-RANGE scoreboard queries (HTTP 400 "Failed to get
-   events endpoint", first seen 2026-09-17 — single dates and week= still answer, and NFL
-   ranges still work). The old code swallowed that error, so college silently vanished from
-   the board. Try the range first; if it fails, rebuild it from week queries. Callers already
-   trim by kickoff time, so extra events from neighbouring weeks are harmless. */
+/* ESPN stopped answering date-RANGE scoreboard queries — `?dates=START-END` now returns
+   HTTP 400 {"code":400,"message":"Failed to get events endpoint."} for BOTH leagues
+   (first seen 2026-09-17). /api/espn rebuilds short ranges day by day, so the range
+   call below normally just works; this stays as the belt-and-braces path for a long
+   range (season-to-date) that the server declines to fan out.
+
+   The important rule is the acceptance test. An `events:[]` payload is a perfectly
+   valid "no games" answer, so a failure that arrives shaped like one is invisible:
+   that is precisely how the college slate vanished (the service worker answered a
+   failed fetch with a fabricated 200 {"events":[]}, and this code believed it). So a
+   range answer is only accepted when the server vouched for it (`_edge`) or it
+   actually carries events. Nothing here returns an empty slate quietly — if every
+   route fails it throws, and loadSlate says so on screen. */
+const ESPN_MAX_LIMIT=500;   // above this ESPN ignores `limit` and returns its default 25
+const lim=n=>Math.min(ESPN_MAX_LIMIT,n);
+const vouched=d=>!!(d&&Array.isArray(d.events)&&(d._edge||d.events.length));
 async function scoreboardRange(base,range,limit,extra,wholeSeason){
-  extra=extra||"";
-  try{ const d=await jget(`${base}/scoreboard?dates=${range}&limit=${limit}${extra}`); if(d&&Array.isArray(d.events)) return d; }catch(e){}
+  extra=extra||""; limit=lim(limit);
+  let firstErr=null;
+  try{ const d=await jget(`${base}/scoreboard?dates=${range}&limit=${limit}${extra}`); if(vouched(d)) return d; firstErr="range answered with an unvouched empty slate"; }
+  catch(e){ firstErr=(e&&e.message)||String(e); }
   const cur=await jget(`${base}/scoreboard?limit=${limit}${extra}`);   // no dates = ESPN's current week
+  if(!vouched(cur)&&!(cur&&Array.isArray(cur.events))) throw new Error(`current-week query failed (${firstErr})`);
   const wk=cur.week?.number||1;
   const weeks=[]; for(let w=wholeSeason?1:Math.max(1,wk-1); w<=wk+(wholeSeason?0:1); w++) if(w!==wk) weeks.push(w);
   const more=await jgetMany(weeks.map(w=>`${base}/scoreboard?week=${w}&seasontype=2&limit=${limit}${extra}`));
   const seen=new Set(), events=[];
   [cur,...more].forEach(d=>((d&&d.events)||[]).forEach(e=>{ if(!seen.has(e.id)){ seen.add(e.id); events.push(e); } }));
-  return {week:cur.week,season:cur.season,events,rangeFallback:true};
+  if(!events.length) throw new Error(`no events from the range or the week rebuild (${firstErr})`);
+  return {week:cur.week,season:cur.season,events,_edge:{src:"rebuilt-by-week",weeks:[wk,...weeks]}};
 }
 async function loadSlate(){
   const {mon,sun}=weekWindow();
@@ -614,15 +680,28 @@ async function loadSlate(){
   const range=`${ymd(mon)}-${ymd(fetchEnd)}`;
   const inWeek=e=>{ const t=new Date(e.date); return t>=mon&&t<=sunEnd; };
   const out=[];
-  const jobs=[
-    scoreboardRange(NFL,range,100,"").then(d=>{ if(d.week?.number) state.wk.nfl=d.week.number; (d.events||[]).filter(inWeek).forEach(e=>out.push(parseGame(e,"nfl"))); }).catch(()=>{}),
-    scoreboardRange(CFB,range,400,"&groups=80").then(d=>{ if(d.week?.number) state.wk.cfb=d.week.number; (d.events||[]).filter(inWeek).forEach(e=>out.push(parseGame(e,"cfb"))); }).catch(()=>{})
-  ];
-  await Promise.all(jobs);
-  // if a league has nothing this window, pull its next games so the board isn't blank
-  if(!out.some(g=>g.lg==="nfl")){
-    try{ const d=await jget(`${NFL}/scoreboard?limit=100`); (d.events||[]).forEach(e=>{const g=parseGame(e,"nfl"); g.nextWeek=true; out.push(g);}); }catch(e){}
-  }
+  // A league's feed failing is NEVER swallowed. It used to be `.catch(()=>{})`, which
+  // is why an ESPN change could take college off the board with nothing on screen
+  // saying so, for a week. Now the reason is kept and rendered.
+  const feedErr={};
+  const load=(base,lgk,cap,extra)=>scoreboardRange(base,range,cap,extra)
+    .then(d=>{ if(d.week?.number) state.wk[lgk]=d.week.number; (d.events||[]).filter(inWeek).forEach(e=>out.push(parseGame(e,lgk))); if(d._edge&&d._edge.daysFailed) feedErr[lgk]=`partial: ${d._edge.daysFailed} of ${d._edge.days} days missing`; })
+    .catch(e=>{ feedErr[lgk]=(e&&e.message)||String(e); });
+  await Promise.all([load(NFL,"nfl",100,""),load(CFB,"cfb",400,"&groups=80")]);
+  // If a league has nothing in this window, pull its current games so the board isn't
+  // blank. BOTH leagues get this — for a week only NFL had it, so an upstream break
+  // that hit both left NFL looking healthy and college looking like an empty Saturday.
+  const rescue=async(base,lgk,cap,extra)=>{
+    if(out.some(g=>g.lg===lgk)) return;
+    try{
+      const d=await jget(`${base}/scoreboard?limit=${lim(cap)}${extra||""}`);
+      const evs=(d&&d.events)||[];
+      if(!evs.length&&!feedErr[lgk]&&!(d&&d._edge)) feedErr[lgk]="feed answered with an empty slate and would not vouch for it";
+      evs.forEach(e=>{const g=parseGame(e,lgk); if(!inWeek(e)) g.nextWeek=true; out.push(g);});
+    }catch(e){ feedErr[lgk]=feedErr[lgk]||((e&&e.message)||String(e)); }
+  };
+  await Promise.all([rescue(NFL,"nfl",100,""),rescue(CFB,"cfb",400,"&groups=80")]);
+  state.feedErr=feedErr;
   out.sort((a,b)=>new Date(a.date)-new Date(b.date));
   applyLineMovement(out,range);
   state.games=out; state.lastOdds=Date.now(); invalidateEdges();
@@ -816,7 +895,8 @@ async function loadSeasonResults(){
   const out=[];
   const grab=async(base,lg,extra)=>{
     try{
-      const d=await scoreboardRange(base,`${start}-${end}`,900,extra,true);
+      // 900 was silently ignored by ESPN (limit caps at 500) and came back as 25 events
+      const d=await scoreboardRange(base,`${start}-${end}`,ESPN_MAX_LIMIT,extra,true);
       (d.events||[]).forEach(e=>{
         const c=(e.competitions||[])[0]||{};
         if((c.status?.type?.state)!=="post") return;
@@ -2201,6 +2281,150 @@ function renderTop(){
   document.getElementById("bankrollInput")?.addEventListener("change",e=>{ state.bankroll=Math.max(0,Number(e.target.value)||0); lsSet("edgeboard-bankroll",state.bankroll); renderTop(); });
   updateLive();
 }
+/* ================= BEST BETS =================
+   Deliberately NOT a new model. This is the board's existing machinery — edgesFor →
+   playProb → quarter-Kelly — narrowed to the plays that clear the stated bar, split
+   by league, and shown with the number behind each pick and where that number came
+   from. A pick with no visible basis is not actionable, so every row carries its
+   evidence, its measured hit rate, the sample that hit rate came from, the market
+   number it is priced against and which book priced it.
+
+   It is allowed to be empty, and that is the point. When nothing clears the bar it
+   says "nothing worth betting" for that league instead of ranking the least-bad
+   options — a padded list would destroy the only thing this page is good for. */
+const BREAK_EVEN=52.4;                  // -110 both ways
+/* Where a signal's hit rate comes from, in words, with its sample size. */
+function probBasis(cat,lg){
+  const live=(state.learned||{})[cat];
+  if(live&&live.n>=LEARN_MIN)
+    return {src:"own record",label:`this board's own graded record: <b>${live.pct}%</b> over ${live.n} calls`};
+  const prior=(BACKTEST_2025[lg]||{})[cat];
+  if(prior)
+    return {src:"2023–25 backtest",label:`<b>${prior.pct}%</b> across ${prior.n} games — ${prior.note}`};
+  const w=SIGNAL_WEIGHT[cat]||1;
+  return {src:"default prior",label:`no measured record yet — conservative default for a weight-${w} signal (<b>${DEFAULT_PROB_BY_WEIGHT[w]}%</b>)`};
+}
+/* The price on offer, and whether it is real or the standard -110 assumption. */
+function priceInfo(g,dir){
+  const d=state.detail[g.id]||{};
+  const raw=(dir==="OVER")?d.overOdds:(dir==="UNDER")?d.underOdds:
+    (dir===g.home.ab)?(d.homeSpreadOdds??d.spreadOdds):(dir===g.away.ab)?(d.awaySpreadOdds??d.spreadOdds):null;
+  return raw!=null?{odds:raw,assumed:false}:{odds:-110,assumed:true};
+}
+function bestBets(){
+  const bar=BEST_MIN_PROB, clear=[], near=[];
+  state.games.filter(g=>g.state!=="post").forEach(g=>{
+    const strong=edgesFor(g).filter(e=>e.k==="strong"&&e.dir);
+    const byDir={}; strong.forEach(e=>{ (byDir[e.dir]=byDir[e.dir]||[]).push(e); });
+    Object.entries(byDir).forEach(([dir,list])=>{
+      const cats=[...new Set(list.map(e=>e.cat))];
+      const pr=playProb(cats,g.lg,g); if(!pr) return;
+      const live=g.state==="in", d=state.detail[g.id]||{};
+      const isTot=dir==="OVER"||dir==="UNDER";
+      const openN=isTot?d.openTotal:d.openSpread, nowN=isTot?g.total:g.spread;
+      const price=priceInfo(g,dir);
+      const contested=againstCount(g,dir)>=2;
+      const st=kellyStake(pr.p,price.odds);
+      // "worth betting" is the board's OWN cut, not a new rule: strong, uncontested,
+      // clear of the bar, and inside this week's top MAX_BETS by edge with a positive
+      // quarter-Kelly fraction. Everything else strong is shown separately, unstaked.
+      const inCut=!contested&&betCut.has(`${g.id}|${dir}`)&&st.f>0;
+      const row={g,lg:g.lg,dir,cats,contested,live,
+        p:pr.p,src:pr.src,edge:Math.round((pr.p-BREAK_EVEN)*10)/10,
+        call:callNumber(g,dir,live),
+        odds:price.odds,assumed:price.assumed,
+        book:g.book||null,
+        marketFrom:live?"ESPN core feed, live line":"ESPN scoreboard, pregame line",
+        stake:inCut?st:{f:0,pct:0,dollars:0,capped:false,cut:true},
+        inCut,
+        why:(list[0]||{}).play||"",
+        signals:cats.map(c=>{ const e=list.find(x=>x.cat===c)||{}; return {cat:c,play:e.play||c,why:e.why||"",...probBasis(c,g.lg)}; }),
+        move:(openN!=null&&nowN!=null&&openN!==nowN)?{from:openN,to:nowN,isTot}:null,
+        kick:new Date(g.date)};
+      ((!contested&&pr.p>=bar)?clear:near).push(row);
+    });
+  });
+  const rank=(a,b)=>b.p-a.p||b.cats.length-a.cats.length||a.kick-b.kick;
+  clear.sort(rank); near.sort(rank);
+  const staked=clear.filter(r=>r.inCut), unstaked=clear.filter(r=>!r.inCut);
+  const by=list=>({nfl:list.filter(r=>r.lg==="nfl"),cfb:list.filter(r=>r.lg==="cfb")});
+  return {bar,breakEven:BREAK_EVEN,rows:staked,unstaked,near,
+    byLeague:by(staked),unstakedByLeague:by(unstaked),nearByLeague:by(near)};
+}
+const LG_NAME={nfl:"NFL",cfb:"College football"};
+function bestRow(r,i){
+  const num=`${r.odds>0?"+":""}${r.odds}`;
+  const stake=r.contested?"contested — no stake"
+    :r.stake.cut?`no stake — outside this week's top ${MAX_BETS} by edge`
+    :r.stake.dollars>0?`¼-Kelly <b>$${r.stake.dollars}</b> · ${r.stake.pct}% of $${state.bankroll}`
+    :"no stake — est. at or under break-even";
+  return `<div class="toprow bbrow">
+    <div class="topnum">${i+1}</div>
+    <div class="topbody">
+      <div class="topplay">${r.g.away.logo?`<img class="tlogo" src="${r.g.away.logo}" alt="">`:""}${r.g.home.logo?`<img class="tlogo" src="${r.g.home.logo}" alt="">`:""} ▶ ${r.live?"LIVE BET":"BET"}: ${r.call}</div>
+      <div class="topgame">${r.g.name} · ${r.live?`LIVE ${r.g.away.score}–${r.g.home.score} ${r.g.short}`:fmtTime(r.g.date)}${r.g.nextWeek?" · next week":""}</div>
+      <div class="bbbasis">
+        <div><span class="bbk">Because</span> ${r.why}${r.cats.length>1?` <span class="dim">+ ${r.cats.length-1} more signal${r.cats.length>2?"s":""} agreeing</span>`:""}</div>
+        <div><span class="bbk">Hit rate</span> <b>${r.p}%</b> estimated · <b>${r.edge>0?"+":""}${r.edge} pts</b> over the ${r.breakEven||BREAK_EVEN}% break-even</div>
+        <div><span class="bbk">Number</span> ${r.call} at <b>${num}</b>${r.assumed?' <span class="dim">(standard −110 assumed — ESPN carried no price for this side)</span>':`${r.book?` <span class="dim">· ${r.book} via ${r.marketFrom}</span>`:` <span class="dim">· ${r.marketFrom}</span>`}`}</div>
+        ${r.move?`<div><span class="bbk">Line</span> opened ${r.move.isTot?r.move.from:(r.move.from>0?"+":"")+r.move.from} → now ${r.move.isTot?r.move.to:(r.move.to>0?"+":"")+r.move.to}</div>`:""}
+        <div><span class="bbk">Stake</span> ${stake}</div>
+      </div>
+      <details class="bbwhy"><summary>Where these numbers come from</summary>
+        ${r.signals.map(sg=>`<div class="bbsig"><div class="bbsigh"><span class="catchip">${sg.cat}</span> <b>${sg.play}</b> <span class="srcnote">${sg.src}</span></div>
+          <div class="bbsigp">${sg.label}</div>${sg.why?`<div class="bbsigw">${sg.why}</div>`:""}</div>`).join("")}
+        <div class="bbsigp">Combined: the strongest signal sets the base and each extra agreeing signal adds half its own margin over break-even, capped at ${PROB_CAP}%. Estimates, not promises.</div>
+      </details>
+      ${timingNote({cats:r.cats})}
+    </div>
+    <div class="topsupport">
+      <button class="tbtn betbtn${onTicket(r.g,r.dir)?" on":""}" data-bet="${r.g.id}|${r.dir}" style="margin-bottom:4px">${onTicket(r.g,r.dir)?"✓ ticket":"Bet"}</button>
+      <div class="tsn">${r.p}%</div>
+      <div class="tsl">${r.stake.dollars>0?`$${r.stake.dollars}`:"no stake"}</div>
+      <div class="tsl">${r.cats.length} signal${r.cats.length===1?"":"s"}</div>
+    </div>
+  </div>`;
+}
+function renderBest(){
+  const box=document.getElementById("board");
+  const ex=recomputeExposure();             // must run first: it decides this week's cut
+  const B=bestBets();
+  const lgs=state.league==="all"?["nfl","cfb"]:[state.league];
+  const alsoList=(title,list,note)=>list.length?`<details class="bbwhy alsolist"><summary>${title}</summary>
+      ${list.slice(0,12).map(r=>`<div class="bbsig"><div class="bbsigh"><b>${r.call}</b> — ${r.g.name} <span class="srcnote">${r.p}% est.${r.contested?" · contested":""}</span></div>
+        <div class="bbsigp">${note(r)} Because: ${r.why}</div></div>`).join("")}</details>`:"";
+  const section=lg=>{
+    const rows=B.byLeague[lg], unst=B.unstakedByLeague[lg], nearby=B.nearByLeague[lg];
+    const head=`<div class="sech">${LG_NAME[lg]}${rows.length?` <span class="cnt">${rows.length} worth betting</span>`:""}</div>`;
+    const also=alsoList(`${unst.length} more clear the bar but get no stake this week — <b>not bets</b>`,unst,
+                        r=>`Outside this week's top ${MAX_BETS} plays by edge, so it is not staked.`)
+      +alsoList(`${nearby.length} strong but below the bar — <b>not bets</b>`,nearby,
+                r=>r.contested?"Other signals point the opposite way on this market, so it is not staked at any probability."
+                              :`Below the ${B.bar}% bar — the margin over break-even is too thin to stake.`);
+    if(rows.length) return head+rows.map((r,i)=>bestRow(r,i)).join("")+also;
+    // Honest empty state. Near-misses stay collapsed and labelled "not bets" — the
+    // page is allowed to have nothing on it, and padding the list would waste it.
+    const anyGames=state.games.some(g=>g.lg===lg&&g.state!=="post");
+    return head+`<div class="bbnone"><b>Nothing worth betting in ${LG_NAME[lg].toLowerCase()} today.</b>
+      ${anyGames
+        ? `Nothing on this slate clears the bar — <b>${B.bar}%</b> estimated hit rate, uncontested, inside this week's top ${MAX_BETS} by edge (break-even is ${B.breakEven}%). That is the answer, not a gap in the data.`
+        : `No ${LG_NAME[lg].toLowerCase()} games are on the board for this week.`}</div>`+also;
+  };
+  box.innerHTML=`<details class="note intro"><summary><b>What gets on this page</b></summary><div style="margin-top:8px">
+      Same engine as the rest of the board — nothing new is modelled here. A play must first be <b>STRONG</b>
+      (one piece of hard evidence, or several weighted signals agreeing), must not be <b>contested</b> by
+      signals pointing the other way, and must then clear <b>${B.bar}%</b> estimated hit rate — a real margin over
+      the <b>${B.breakEven}%</b> break-even you need at −110. Everything that qualifies is listed with the number
+      behind it and where that number came from; open “Where these numbers come from” on any row for the sample
+      it rests on. Stakes are quarter-Kelly on your bankroll, only the top ${MAX_BETS} by edge get one, and they
+      are capped together at ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% of bankroll. Estimates capped at ${PROB_CAP}% — reference only, nothing is placed.
+    </div></details>
+    <div class="prow" style="align-items:center"><div class="pstake"><label>Bankroll $ <input type="number" id="bankrollInputB" value="${state.bankroll}" min="0" step="50" style="width:100px"></label></div>
+      <span class="dim" style="font-size:12px">${B.rows.length} staked of ${B.rows.length+B.unstaked.length} clearing the ${B.bar}% bar, out of ${B.rows.length+B.unstaked.length+B.near.length} strong plays${ex.factor<1?` · stakes scaled ×${ex.factor.toFixed(2)} by the weekly ${Math.round(WEEKLY_EXPOSURE_CAP*100)}% cap`:""}</span></div>
+    ${lgs.map(section).join("")}`;
+  document.getElementById("bankrollInputB")?.addEventListener("change",e=>{ state.bankroll=Math.max(0,Number(e.target.value)||0); lsSet("edgeboard-bankroll",state.bankroll); renderBest(); });
+  updateLive();
+}
 function renderProps(){
   const box=document.getElementById("board");
   const rows=state.games.filter(g=>g.state!=="post").map(g=>({g,props:propsFor(g)})).filter(x=>x.props.length);
@@ -2700,6 +2924,7 @@ function render(){
   if(state.view==="ext"){ renderExt(); return; }
   if(state.view==="ticket"){ renderTicket(); return; }
   if(state.view==="parlay"){ renderParlay(); return; }
+  if(state.view==="best"){ renderBest(); return; }
   if(state.view==="top"){ renderTop(); return; }
   if(state.view==="props"){ renderProps(); return; }
   const box=document.getElementById("board");
@@ -2750,8 +2975,18 @@ function render(){
   }
   updateLive();
 }
+/* A league whose feed broke says so, on screen, with the reason. The whole point:
+   "no games today" and "we could not fetch the games" must never look the same. */
+function renderFeedWarn(){
+  const box=document.getElementById("feedWarn"); if(!box) return;
+  const errs=Object.entries(state.feedErr||{});
+  if(!errs.length){ box.hidden=true; box.innerHTML=""; return; }
+  const name={nfl:"NFL",cfb:"College football"};
+  box.hidden=false;
+  box.innerHTML=errs.map(([lg,why])=>`<div><b>${name[lg]||lg} feed problem.</b> These games are missing or incomplete — this is <b>not</b> an empty slate. <code>${String(why).replace(/[<>&]/g,"")}</code></div>`).join("");
+}
 function updateLive(){
-  updateBell();
+  updateBell(); renderFeedWarn();
   const n=state.games.length, e=state.games.filter(g=>edgesForScored(g).length).length;
   const s=state.games.filter(g=>edgesForScored(g).some(x=>x.k==="strong")).length;
   const lv=state.games.filter(g=>g.state==="in").length;

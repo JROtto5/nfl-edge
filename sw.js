@@ -6,7 +6,7 @@
      an old weather reading would be worse than showing nothing — a bettor acting on
      a cached number is exactly the failure this whole tool exists to prevent.
 */
-const SHELL="edge-shell-v6";
+const SHELL="edge-shell-v7";
 const SHELL_FILES=["/","/index.html","/intro","/intro.html","/manifest.webmanifest","/icon-192.png","/icon-512.png"];
 
 self.addEventListener("install",e=>{
@@ -36,7 +36,15 @@ self.addEventListener("fetch",e=>{
   if(url.origin===location.origin&&url.pathname.startsWith("/api/")) return;
   // never cache live sports data — stale odds are actively harmful
   if(url.hostname.endsWith("espn.com")||url.hostname.includes("espncdn")){
-    e.respondWith(fetch(req).catch(()=>new Response(JSON.stringify({events:[]}),{headers:{"Content-Type":"application/json"}})));
+    // A failed feed must FAIL. This used to answer HTTP 200 {"events":[]} whenever the
+    // upstream fetch rejected, which is a lie the app cannot see through: an empty
+    // events array is a perfectly valid "no games" answer. That is exactly how the
+    // college slate went missing for a week — ESPN started rejecting the date-range
+    // query, this handed back a fabricated empty week, and the code believed it.
+    // Return a real error instead so the caller throws and can say so out loud.
+    e.respondWith(fetch(req).catch(err=>new Response(
+      JSON.stringify({error:"espn unreachable from the browser",reason:String(err&&err.message||err)}),
+      {status:503,headers:{"Content-Type":"application/json"}})));
     return;
   }
   // fonts: cache-first (they never change and shouldn't block first paint)
