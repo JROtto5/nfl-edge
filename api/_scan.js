@@ -26,7 +26,7 @@ function parseOdds(d){
   }
   return null;
 }
-async function scan(){
+async function scan(opts={}){
   const t0=Date.now(), now=Date.now(), horizon=now+7*864e5;
   const cache=(await readJSON("edge/pastodds.json"))||{};           // finished games: closing totals never change
   const out={generatedAt:new Date().toISOString(),games:[]};
@@ -39,7 +39,7 @@ async function scan(){
     // today's games in any state (so the day view shows live/final with results) + everything upcoming in 7 days
     const etDay=t=>new Date(new Date(t).getTime()-4*3600e3).toISOString().slice(0,10);
     const today=etDay(now);
-    const up=all.filter(g=>(g.state==="pre"&&new Date(g.date).getTime()<=horizon)||(etDay(g.date)===today));
+    const up=opts.past?past.slice():all.filter(g=>(g.state==="pre"&&new Date(g.date).getTime()<=horizon)||(etDay(g.date)===today));
     // closing totals for the last 3 games of every team in the upcoming slate (cached)
     const teams=new Set(up.flatMap(g=>[g.home,g.away]));
     const needIds=new Set(); const byTeam={};
@@ -47,9 +47,12 @@ async function scan(){
     teams.forEach(t=>(byTeam[t]||[]).slice(-3).forEach(g=>{ if(cache[g.id]===undefined) needIds.add(g.id); }));
     const fetched=await pool([...needIds],16,id=>fetchOne(`${CORE[lg]}/events/${id}/competitions/${id}/odds`).then(d=>[id,parseOdds(d)]));
     fetched.forEach(x=>{ if(x) cache[x[0]]=x[1]?x[1].total:null; });
-    const upOdds=await pool(up,16,g=>fetchOne(`${CORE[lg]}/events/${g.id}/competitions/${g.id}/odds`).then(parseOdds));
+    // past mode: finished games' full closing odds never change — cache them
+    const full=opts.past?((await readJSON("edge/pastfull.json"))||{}):null;
+    const upOdds=await pool(up,16,g=>(full&&full[g.id]!==undefined)?Promise.resolve(full[g.id]):fetchOne(`${CORE[lg]}/events/${g.id}/competitions/${g.id}/odds`).then(parseOdds).then(o=>{ if(full) full[g.id]=o; return o; }));
+    if(full){ up.forEach((g,i)=>{ if(upOdds[i]&&upOdds[i].total!=null) cache[g.id]=upOdds[i].total; }); await writeJSON("edge/pastfull.json",full); }
     // kickoff weather for games in the next 3 days (forecasts further out are noise)
-    const wx=await pool(up,16,g=>(new Date(g.date).getTime()-now<3*864e5&&!g.indoor)?fetchOne(`${SITE[lg]}/summary?event=${g.id}`).then(d=>{ const w=((d||{}).gameInfo||{}).weather||{}; return {gust:w.gust??null,precip:w.precipitation??null,temp:w.temperature??null}; }):null);
+    const wx=await pool(up,16,g=>(!opts.past&&new Date(g.date).getTime()-now<3*864e5&&!g.indoor)?fetchOne(`${SITE[lg]}/summary?event=${g.id}`).then(d=>{ const w=((d||{}).gameInfo||{}).weather||{}; return {gust:w.gust??null,precip:w.precipitation??null,temp:w.temperature??null}; }):null);
     const M=LOGIT[lg];
     up.forEach((g,i)=>{
       const o=upOdds[i]; if(!o||o.total==null||o.spread==null){ out.games.push({...g,noLine:true}); return; }

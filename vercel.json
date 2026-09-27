@@ -33,6 +33,10 @@
     "api/upcoming.js": {
       "maxDuration": 60,
       "includeFiles": "api/_logit.json"
+    },
+    "api/applog.js": {
+      "maxDuration": 60,
+      "includeFiles": "{api/_logit.json,verdict.js}"
     }
   },
   "rewrites": [

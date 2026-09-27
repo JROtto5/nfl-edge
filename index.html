@@ -34,7 +34,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin:2px 
 /* stat strip */
 .stats{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px;margin-bottom:14px}
 .stat{background:var(--glass);border:1px solid var(--edge);border-radius:18px;padding:12px 14px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-.stat .v{font:800 24px/1 var(--mono);letter-spacing:-.03em}.stat .l{font:700 10.5px var(--display);color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin-top:7px}
+.stat .v{font:800 clamp(17px,5.4vw,24px)/1 var(--mono);letter-spacing:-.04em;white-space:nowrap}.stat .l{font:700 10.5px var(--display);color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin-top:7px}
 .pos{color:var(--win)}.neg{color:var(--loss)}.dim{color:var(--dim)}
 /* hero best bet */
 .hero{position:relative;border-radius:28px;padding:22px 20px 20px;overflow:hidden;margin-bottom:18px;border:1px solid var(--edge2);cursor:pointer;isolation:isolate;
@@ -52,6 +52,8 @@ header{display:flex;align-items:center;justify-content:space-between;margin:2px 
 .gauge .trk{stroke:#ffffff18}.gauge .val{stroke:url(#gg);stroke-linecap:round;stroke-dasharray:283;stroke-dashoffset:283;transition:stroke-dashoffset 1.4s cubic-bezier(.2,.8,.2,1)}
 .gauge .num{position:absolute;inset:0;display:grid;place-items:center;text-align:center}.gauge .num b{font:800 24px/1 var(--mono)}.gauge .num span{display:block;font:700 9.5px var(--display);letter-spacing:.14em;color:var(--dim);margin-top:3px}
 /* day chips */
+.sect{font:800 11px var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:4px 4px 10px}
+.hero+.hero{margin-top:-6px}
 .days{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -16px 12px;padding:2px 16px 4px;position:sticky;top:0;z-index:5}
 .days::-webkit-scrollbar{display:none}
 .days button{flex:none;font:800 13px var(--display);color:var(--dim);background:var(--glass);border:1px solid var(--edge);padding:9px 14px;border-radius:99px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:.2s}
@@ -133,15 +135,16 @@ nav button.on{background:var(--ink);color:#07090f}
 </section>
 
 <section id="vHist" hidden>
-  <div class="hcard"><div class="hl">Profit · $10 a play</div><div class="big" id="hTot">—</div><div class="dim" id="hTots" style="margin-top:8px;font-weight:600"></div><div id="chart" style="margin-top:14px"></div></div>
+  <div class="hcard"><div class="hl">Every play this app makes · 2026</div><div class="big" id="hTot">—</div><div class="dim" id="hTots" style="margin-top:8px;font-weight:600"></div><div id="chart" style="margin-top:14px"></div></div>
   <div class="hcard split"><div><div class="hl">College</div><div class="v" id="hC">—</div><div class="s" id="hCs"></div></div><div><div class="hl">NFL</div><div class="v" id="hN">—</div><div class="s" id="hNs"></div></div></div>
   <div class="hcard"><div class="hl">Recent plays</div><div id="recent"></div></div>
-  <div class="hcard"><div class="hl">Retired signals</div><div id="bysig"></div></div>
-  <div class="foot">$10 a play at -110 · graded by the server every 10 minutes · <a href="/board">full analysis board</a></div>
+  <div class="hcard"><div class="hl">What's working</div><div id="bysig"></div></div>
+  <div class="foot">Every 2026 game run through today's exact rules, using only what was known before kickoff, graded at the closing line and price. Stakes as shown ($10, $5 on NFL model plays). Some rules were tuned on this season's data, so expect the real rate to settle nearer 57–60%. · <a href="/board">full analysis board</a></div>
 </section>
 
 <nav><button data-v="board" class="on">Today</button><button data-v="hist">History</button></nav>
 
+<script src="/verdict.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const money=x=>(x<0?"−":"+")+"$"+Math.abs(x).toFixed(0);
@@ -151,42 +154,6 @@ const dayLabel=d=>{ const k=dayKey(d), t=new Date(); if(k===dayKey(t)) return "T
 const col=(c,f)=>c?"#"+c:f;
 let UP=null, DAY=null;
 
-/* ---- the one rule set: what's a PLAY, what's a LEAN, and how confident ---- */
-function verdict(g){
-  if(g.noLine) return {tier:"none",why:["No line posted yet."]};
-  const m=g.model, f=g.flags, why=[]; let pick=null;
-  if(g.lg==="cfb"){
-    if(f.dogimp10&&!(m.dir==="UNDER"&&m.conf>=55)){ pick={dir:"OVER",tier:"play",conf:Math.max(60,m.dir==="OVER"?m.conf:0)}; why.push(`Big mismatch: the underdog is expected to score only ~${g.dogImp}. Backups and garbage-time scores push these over — this signal is 41–20 this season.`); }
-    if(m.conf>=58&&(!pick||pick.dir===m.dir)){ pick={dir:m.dir,tier:"play",conf:Math.max(pick?pick.conf:0,Math.min(65,m.conf))}; why.push(`The totals model is ${m.conf}% on the ${m.dir} — its strongest tier, which hit ~60% on seasons it had never seen.`); }
-    else if(!pick&&m.conf>=55){ pick={dir:m.dir,tier:"play",conf:m.conf}; why.push(`The totals model is ${m.conf}% on the ${m.dir}. This 55–58% tier has gone 36–24 (60%) in college this season.`); }
-    else if(!pick&&m.conf>=52&&f.lowlast&&m.dir==="OVER"){ pick={dir:"OVER",tier:"lean",conf:55}; why.push(`A team is coming off a ≤30-point game (college overs after that: 15–9 this season) and the model tilts over at ${m.conf}%.`); }
-    if(pick&&pick.dir==="OVER"&&f.lowlast&&pick.tier==="play") why.push("One of these teams just played a ≤30-point game — totals over-correct after those (15–9 this season).");
-    if(pick&&f.rankclash&&pick.dir==="UNDER") why.push("Ranked vs ranked — these have leaned under the last three seasons.");
-  } else {
-    if(f.bothunder&&m.dir==="OVER"&&m.conf>=55){ pick={dir:"OVER",tier:"play",conf:Math.min(62,Math.max(58,m.conf))}; why.push(`Both teams' last game went under the total — NFL totals over-correct after that (over hit 55 / 59 / 63% the last three seasons) — and the model agrees at ${m.conf}%.`); }
-    else if((f.windy||f.wet)&&!g.indoor&&!(m.conf>=58&&m.dir==="OVER")){ pick={dir:"UNDER",tier:m.conf>=58&&m.dir==="UNDER"?"play":"lean",conf:m.conf>=58&&m.dir==="UNDER"?Math.min(62,m.conf+1):57,half:true}; why.push(`Weather: ${g.weather.gust} mph gusts, ${g.weather.precip}% rain. NFL weather unders are 7–1 this season, but historically swingy (71 / 43 / 61% by year) and the market has usually moved the total already.`); }
-    else if(f.bothunder&&!(m.dir==="UNDER"&&m.conf>=55)&&!f.windy){ pick={dir:"OVER",tier:"lean",conf:57}; why.push(`Both teams' last game went under the total. NFL totals over-correct after that: over hit 55 / 59 / 63% the last three seasons. The old board called this strong (58%); it's a lean here because the model doesn't back it (${m.conf}% ${m.dir}) and it's only 2–3 when re-checked on 2026 games.`); }
-    else if(m.conf>=58){ pick={dir:m.dir,tier:"play",conf:Math.min(60,m.conf),half:true}; why.push(`The NFL totals model is ${m.conf}% on the ${m.dir}. At 58%+ it's 9–3 this season and was a small winner in each of the last three (55 / 57 / 52%) — $5 until it has a bigger sample.`); }
-  }
-  if(pick&&pick.dir==="OVER"&&f.windy){ why.push(`Skipped: ${g.weather.gust} mph gusts argue against an over.`); pick=null; }
-  let side=null;
-  if(g.lg==="nfl"&&g.spread!=null){ const a=Math.abs(g.spread), dog=g.spread>0?g.home:g.away, favT=g.spread<0?g.home:g.away;
-    const o=g.openSpread!=null?Math.abs(g.openSpread):null, crossed=o!=null&&a>o&&[3,7].some(k=>o<k&&a>=k);
-    if(crossed){ side={team:dog,line:+a,tier:"lean",conf:56}; why.push(`<b>Side lean:</b> the line moved through ${o<3&&a>=3?"3":"7"} toward the favorite (${o} → ${a}). Dogs getting a key number this way: 58% the last two seasons, 5–1 this season.`); }
-    else if(a>=7&&a<=9.5){ side={team:dog,line:+a,tier:"lean",conf:56}; why.push(`<b>Side lean:</b> NFL dogs of +7 to +9.5 covered 57% the last three seasons and are 5–2 this season.`); }
-    else if(a>=0.5&&a<=2.5){ side={team:favT,line:-a,tier:"lean",conf:55}; why.push(`<b>Side lean:</b> small NFL favorites (0.5–2.5) covered 55% the last three seasons and are 5–1 this season.`); } }
-  if(f.unrfavfcs){ side={team:g.fav,line:-Math.abs(g.spread),tier:"play",conf:60}; why.push(`<b>Side:</b> ${g.fav} is unranked and laying ${Math.abs(g.spread)} to an FCS school. Unranked favorites keep their foot down in these games — the favorite has covered 52–32 (62%) this season.`); }
-  if(!pick&&!side) return {tier:"none",why:why.length?why:["Nothing measured says this line is off — the book's number looks fair."]};
-  if(!pick) return {tier:side.tier==="play"?"play":"none",conf:side.conf,dir:null,side,why};
-  return {...pick,side,why};
-}
-function sideResult(g,s){ if(!s||g.state==="pre") return null; if(g.state==="in") return "live"; const cm=(g.hs-g.as)+g.spread; if(cm===0) return "push"; return ((cm>0)===(s.team===g.home))?"win":"loss"; }
-function result(g,v){ if(!v.dir||g.total==null) return null; const t=g.hs+g.as; if(g.state==="post") return t===g.total?"push":((t>g.total)===(v.dir==="OVER")?"win":"loss"); if(g.state==="in") return "live"; return null; }
-/* every staked play on a game (a game can carry a total AND a side) */
-function playsOf(g){ const v=verdict(g), out=[];
-  if(v.dir&&v.tier==="play") out.push({g,v,lab:`${v.dir} ${g.total}`,conf:v.conf,r:result(g,v),amt:v.half?5:10,price:v.dir==="OVER"?g.overOdds:g.underOdds});
-  if(v.side&&v.side.tier==="play") out.push({g,v,lab:`${v.side.team} ${v.side.line}`,conf:v.side.conf,r:sideResult(g,v.side),amt:10,price:null});
-  return out; }
 function analysis(g){ const v=verdict(g), f=g.form||{home:{},away:{}}, w=g.weather, moved=g.openTotal!=null&&g.openTotal!==g.total;
   return `<div class="in"><h4>Why</h4>${v.why.map(x=>`<p>${x}</p>`).join("")}
     ${g.noLine?"":`<h4>The numbers</h4><div class="kv">
@@ -201,10 +168,10 @@ const whenTxt=g=>g.state==="pre"?`${dayLabel(g.date)==="Today"?"":dayLabel(g.dat
 const stateTag=r=>r==="live"?'<span class="state live">LIVE</span>':r==="win"?'<span class="state win">WON</span>':r==="loss"?'<span class="state loss">LOST</span>':"";
 function countdown(d){ const ms=new Date(d)-Date.now(); if(ms<=0) return "kicking off"; const h=Math.floor(ms/36e5), m=Math.floor(ms%36e5/6e4); return h>=24?`in ${Math.floor(h/24)}d ${h%24}h`:`in ${h}h ${m}m`; }
 
-function heroHtml(x){ const g=x.g, c1=col(g.awayColor,"#1b4dff"), c2=col(g.homeColor,"#34f5a0");
+function heroHtml(x,label){ const g=x.g, c1=col(g.awayColor,"#1b4dff"), c2=col(g.homeColor,"#34f5a0");
   const off=283-283*Math.min(1,(x.conf-50)/15);   // 50% → empty, 65% → full
   return `<div class="hero" style="--c1:${c1}cc;--c2:${c2}cc" data-g="${g.id}">
-    <span class="tag">⚡ Best bet ${x.r?"":"· "+countdown(g.date)}</span>
+    <span class="tag">${label||"⚡ Best bet"} ${x.r?"":"· "+countdown(g.date)}</span>
     <div class="row"><div style="min-width:0"><div class="pick">${x.lab}${stateTag(x.r)}</div>
       <div class="match"><img src="${g.awayLogo||""}" alt=""> ${g.awayName||g.away} <span class="dim">@</span> <img src="${g.homeLogo||""}" alt=""> ${g.homeName||g.home}</div></div>
       <div class="gauge"><svg viewBox="0 0 100 100"><circle class="trk" cx="50" cy="50" r="45" fill="none" stroke-width="8"/><circle class="val" cx="50" cy="50" r="45" fill="none" stroke-width="8" data-off="${off}"/></svg><div class="num"><div><b>${Math.round(x.conf)}%</b><span>CONFIDENT</span></div></div></div></div>
@@ -233,10 +200,11 @@ function renderBoard(){
   $("sN").textContent=upcoming.length;
   $("days").innerHTML=[...dayMap.entries()].map(([k,d])=>`<button data-day="${k}" class="${k===DAY?"on":""}">${d.label}<em>${d.list.length}</em></button>`).join("");
   const list=DAY?dayMap.get(DAY).list.slice().sort((a,b)=>b.conf-a.conf):[];
-  // hero = highest-confidence play still to come (or best of the selected day)
-  const best=list[0]||null;   // best bet = the highest-confidence play on the selected day
-  $("hero").innerHTML=best?heroHtml(best):"";
-  $("games").innerHTML=list.length?list.filter(x=>x!==best).map(cardHtml).join(""):`<div class="empty"><b>No plays yet</b>The model only calls a game when it's measured to be right. Lines are still posting — check back.</div>`;
+  // two heroes: the best college and best NFL play still to come this week
+  const pre=all.filter(x=>x.g.state==="pre").sort((a,b)=>b.conf-a.conf||b.amt-a.amt||new Date(a.g.date)-new Date(b.g.date));
+  const bestC=pre.find(x=>x.g.lg==="cfb"), bestN=pre.find(x=>x.g.lg==="nfl");
+  $("hero").innerHTML=(bestC?heroHtml(bestC,"🏈 Best college bet"):"")+(bestN?heroHtml(bestN,"🏟 Best NFL bet"):"");
+  $("games").innerHTML=list.length?`<div class="sect">${dayMap.get(DAY).label==="Today"?"Today's":dayMap.get(DAY).label} plays</div>`+list.map(cardHtml).join(""):`<div class="empty"><b>No plays yet</b>The model only calls a game when it's measured to be right. Lines are still posting — check back.</div>`;
   const isLean=g=>{ const v=verdict(g); return !playsOf(g).length&&(v.tier==="lean"||(v.side&&v.side.tier==="lean")); };
   const leans=gs.filter(isLean), rest=gs.filter(g=>!playsOf(g).length&&!isLean(g));
   $("nLeans").textContent=leans.length; $("leans").innerHTML=leans.map(miniHtml).join("")||'<div class="dim" style="padding:12px">None right now.</div>';
@@ -263,29 +231,31 @@ async function loadRecord(){
 }
 const W=r=>r.result==="win", L=r=>r.result==="loss", P=rs=>rs.reduce((a,r)=>a+(W(r)?100/11:L(r)?-10:0),0), recTxt=rs=>`${rs.filter(W).length}–${rs.filter(L).length}`;
 function countUp(el,to,fmt){ const t0=performance.now(), d=900; const step=t=>{ const k=Math.min(1,(t-t0)/d), e=1-Math.pow(1-k,3); el.textContent=fmt(to*e); if(k<1) requestAnimationFrame(step); }; requestAnimationFrame(step); }
-async function strip(){ try{ const {cfb,nfl}=REC||await loadRecord(); const all=[...cfb,...nfl], v=P(all);
-  const el=$("sPL"); el.className="v "+(v>=0?"pos":"neg"); countUp(el,v,money); $("sRec").textContent=recTxt(all); }catch(e){} }
+async function strip(){ try{ const d=await (await fetch("/api/applog",{cache:"no-store"})).json(); const P=d.plays||[];
+  const W=r=>r.result==="win", L=r=>r.result==="loss", win=r=>r.price!=null&&r.price>0?r.amt*r.price/100:r.amt*100/Math.abs(r.price||110);
+  const v=P.reduce((a,r)=>a+(W(r)?win(r):L(r)?-r.amt:0),0); const el=$("sPL"); el.className="v "+(v>=0?"pos":"neg"); countUp(el,v,money);
+  $("sRec").textContent=`${P.filter(W).length}–${P.filter(L).length}`; }catch(e){} }
 
 async function loadHistory(){
-  const {g,cfb,nfl,contested}=await loadRecord(); const all=[...cfb,...nfl], v=P(all);
-  const tot=$("hTot"); tot.className="big "+(v>=0?"pos":"neg"); countUp(tot,v,money);
-  $("hTots").textContent=`${recTxt(all)} · ${all.length} plays · ${Math.round(100*all.filter(W).length/Math.max(1,all.filter(r=>W(r)||L(r)).length))}% hit rate`;
-  const set=(id,rs)=>{ const x=P(rs); $(id).textContent=money(x); $(id).className="v "+(x>=0?"pos":"neg"); $(id+"s").textContent=`${recTxt(rs)} · ${rs.length} plays`; };
-  set("hC",cfb); set("hN",nfl);
-  // area chart
-  let s=0; const S=all.slice().sort((a,b)=>a.kickoff-b.kickoff).map(r=>({t:r.kickoff,v:s+=W(r)?100/11:L(r)?-10:0}));
+  const d=await (await fetch("/api/applog",{cache:"no-store"})).json(); const P=d.plays||[];
+  const W=r=>r.result==="win", L=r=>r.result==="loss";
+  const win=r=>r.price!=null&&r.price>0?r.amt*r.price/100:r.amt*100/Math.abs(r.price||110);
+  const pl=rs=>rs.reduce((a,r)=>a+(W(r)?win(r):L(r)?-r.amt:0),0), rt=rs=>`${rs.filter(W).length}–${rs.filter(L).length}`;
+  const v=pl(P); const tot=$("hTot"); tot.className="big "+(v>=0?"pos":"neg"); countUp(tot,v,money);
+  const risked=P.reduce((a,r)=>a+r.amt,0);
+  $("hTots").textContent=`${rt(P)} · ${Math.round(100*P.filter(W).length/Math.max(1,P.filter(r=>W(r)||L(r)).length))}% hit · ${Math.round(100*v/Math.max(1,risked))}% return on $${risked} risked`;
+  const C=P.filter(r=>r.lg==="cfb"), N=P.filter(r=>r.lg==="nfl");
+  const set=(id,rs)=>{ const x=pl(rs); $(id).textContent=money(x); $(id).className="v "+(x>=0?"pos":"neg"); $(id+"s").textContent=`${rt(rs)} · ${rs.length} plays`; };
+  set("hC",C); set("hN",N);
+  let s=0; const S=P.map(r=>({t:new Date(r.date).getTime(),v:s+=W(r)?win(r):L(r)?-r.amt:0}));
   if(S.length){ const t0=S[0].t,t1=S.at(-1).t,lo=Math.min(0,...S.map(p=>p.v)),hi=Math.max(10,...S.map(p=>p.v)),Wd=600,H=170;
-    const x=t=>(Wd)*(t-t0)/Math.max(1,t1-t0), y=v=>H-8-(H-16)*(v-lo)/(hi-lo);
-    const line=S.map(p=>`${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(" L");
-    $("chart").innerHTML=`<svg viewBox="0 0 ${Wd} ${H}" style="width:100%;height:auto;overflow:visible"><defs><linearGradient id="ar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34f5a0" stop-opacity=".45"/><stop offset="1" stop-color="#34f5a0" stop-opacity="0"/></linearGradient></defs>
-      <line x1="0" x2="${Wd}" y1="${y(0)}" y2="${y(0)}" stroke="#ffffff22" stroke-dasharray="3 5"/>
-      <path d="M0,${y(0)} L${line} L${Wd},${y(0)} Z" fill="url(#ar)"/><path d="M${line}" fill="none" stroke="#34f5a0" stroke-width="3" stroke-linejoin="round"/>
-      <circle cx="${x(S.at(-1).t)}" cy="${y(S.at(-1).v)}" r="5" fill="#34f5a0"/></svg>`; }
-  $("recent").innerHTML=all.slice().sort((a,b)=>b.kickoff-a.kickoff).slice(0,30).map(r=>`<div class="hrow"><div class="dot ${W(r)?"w":L(r)?"l":"p"}">${W(r)?"W":L(r)?"L":"P"}</div><div class="t">${r.playText.replace(/^Lean\s+/i,"").split(" — ")[0]}<small>${r.awayAb} ${r.finalAway}–${r.finalHome} ${r.homeAb} · ${new Date(r.kickoff).toLocaleDateString([], {month:"short",day:"numeric"})}</small></div><div class="m ${W(r)?"pos":L(r)?"neg":"dim"}">${W(r)?"+$9":L(r)?"−$10":"$0"}</div></div>`).join("")||'<div class="dim">No graded plays yet.</div>';
-  const ret=[["NFL · “QB ruled out”",g.filter(r=>r.lg==="nfl"&&r.cats.includes("qbout"))],["College · 60+ total → under",g.filter(r=>r.lg==="cfb"&&!contested(r)&&r.cats.includes("hightotal")&&!r.cats.some(c=>c==="mtotal"||c==="dogimp10"))]];
-  $("bysig").innerHTML=ret.map(([l,rs])=>{ const x=P(rs); return `<div class="hrow"><div class="dot l">✕</div><div class="t">${l}<small>${recTxt(rs)} · no longer played</small></div><div class="m ${x>=0?"pos":"neg"}">${money(x)}</div></div>`; }).join("");
+    const x=t=>Wd*(t-t0)/Math.max(1,t1-t0), y=v=>H-8-(H-16)*(v-lo)/(hi-lo); const line=S.map(p=>`${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(" L");
+    $("chart").innerHTML=`<svg viewBox="0 0 ${Wd} ${H}" style="width:100%;height:auto;overflow:visible"><defs><linearGradient id="ar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34f5a0" stop-opacity=".45"/><stop offset="1" stop-color="#34f5a0" stop-opacity="0"/></linearGradient></defs><line x1="0" x2="${Wd}" y1="${y(0)}" y2="${y(0)}" stroke="#ffffff22" stroke-dasharray="3 5"/><path d="M0,${y(0)} L${line} L${Wd},${y(0)} Z" fill="url(#ar)"/><path d="M${line}" fill="none" stroke="#34f5a0" stroke-width="3" stroke-linejoin="round"/><circle cx="${x(S.at(-1).t)}" cy="${y(S.at(-1).v)}" r="5" fill="#34f5a0"/></svg>`; }
+  // what's working: by play type
+  const types=[["College · fitted model totals",P.filter(r=>r.lg==="cfb"&&r.kind==="total")],["College · FCS favorite (side)",P.filter(r=>r.kind==="side")],["NFL · totals",N]];
+  $("bysig").innerHTML=types.map(([l,rs])=>{ const x=pl(rs); return `<div class="hrow"><div class="dot ${x>=0?"w":"l"}">${x>=0?"▲":"▼"}</div><div class="t">${l}<small>${rt(rs)} · ${Math.round(100*rs.filter(W).length/Math.max(1,rs.filter(r=>W(r)||L(r)).length))}% hit</small></div><div class="m ${x>=0?"pos":"neg"}">${money(x)}</div></div>`; }).join("");
+  $("recent").innerHTML=P.slice().reverse().slice(0,40).map(r=>`<div class="hrow"><div class="dot ${W(r)?"w":L(r)?"l":"p"}">${W(r)?"W":L(r)?"L":"P"}</div><div class="t">${r.pick}<small>${r.away} ${r.as}–${r.hs} ${r.home} · ${new Date(r.date).toLocaleDateString([], {month:"short",day:"numeric"})} · ${r.conf}%${r.lg==="nfl"?" · NFL":""}</small></div><div class="m ${W(r)?"pos":L(r)?"neg":"dim"}">${W(r)?"+$"+win(r).toFixed(0):L(r)?"−$"+r.amt:"$0"}</div></div>`).join("")||'<div class="dim">No graded plays yet.</div>';
 }
-
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{ document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b)); const h=b.dataset.v==="hist";
   $("vBoard").hidden=h; $("vHist").hidden=!h; $("sub").textContent=h?"season results":"today's plays"; window.scrollTo({top:0,behavior:"smooth"}); if(h) loadHistory(); });
 async function loadUp(){ try{ UP=await (await fetch("/api/upcoming",{cache:"no-store"})).json(); renderBoard(); }catch(e){ $("upd").textContent="reconnecting"; } }
