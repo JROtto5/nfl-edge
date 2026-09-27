@@ -1,8 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Edge Picks</title><meta name="theme-color" content="#0a0e14">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Edge Picks">
+<link rel="apple-touch-icon" href="/icon-192.png"><link rel="icon" href="/icon-192.png">
 <style>
 :root{--bg:#0a0e14;--panel:#111826;--bg2:#182233;--line:#243044;--ink:#e8edf5;--dim:#8a97ab;--green:#3ddc84;--red:#ff5d5d;--amber:#f5b942;--blue:#6aa8ff}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,-apple-system,sans-serif;padding:14px 12px 60px;max-width:760px;margin:0 auto}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,-apple-system,sans-serif;padding:max(14px,env(safe-area-inset-top)) 12px calc(60px + env(safe-area-inset-bottom));max-width:760px;margin:0 auto}
 h1{font-size:24px;margin:0;letter-spacing:.01em}.sub{color:var(--dim);font-size:12px;margin:2px 0 14px}
 h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:22px 0 8px}
 .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}.k{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
