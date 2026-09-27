@@ -25,6 +25,18 @@ h1{font-size:26px;margin:0;font-weight:900;letter-spacing:-.01em}.upd{font-size:
 .g.open .an{display:block}
 .an h4{margin:12px 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
 .an table{width:100%;border-collapse:collapse;font-size:13px}.an td{padding:4px 0;border-bottom:1px dashed var(--line)}.an td:last-child{text-align:right;font-weight:700}
+.hero{background:linear-gradient(135deg,#132a1f,#121a28 60%);border:1px solid #1f4a33;border-radius:18px;padding:16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hero .big{font:900 40px/1 -apple-system,Inter,sans-serif}.hero .lab{font-size:13px;color:var(--dim);margin-top:4px}.hero .rec{text-align:right;font-size:13px;color:var(--dim)}.hero .rec b{display:block;font:900 22px ui-monospace,SFMono-Regular,monospace}
+.p{background:var(--panel);border:1px solid var(--line);border-radius:18px;margin-bottom:10px;overflow:hidden}
+.p .top{display:flex;gap:14px;align-items:center;padding:16px;cursor:pointer}
+.ring{--v:60;width:62px;height:62px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(var(--green) calc((var(--v) - 50)*2%),#223047 0);position:relative}
+.ring::before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--panel)}.ring b{position:relative;font:900 17px ui-monospace,SFMono-Regular,monospace}
+.ring.win{background:var(--green)}.ring.loss{background:var(--red)}
+.p .pick{font:900 22px/1.15 -apple-system,Inter,sans-serif;letter-spacing:-.01em}.p .game{font-size:13px;color:var(--dim);margin-top:3px}.p .game img{width:18px;height:18px;vertical-align:-4px}
+.p .amt{margin-left:auto;text-align:right;flex:none}.p .amt b{font:900 20px ui-monospace,SFMono-Regular,monospace}.p .amt div{font-size:11px;color:var(--dim)}
+.p .an{display:none;padding:0 16px 16px;font-size:14px;color:#c9d2e0}.p.open .an{display:block}
+.st{display:inline-block;font-size:10px;font-weight:900;letter-spacing:.08em;padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:2px}.st.win{background:var(--green);color:#062312}.st.loss{background:var(--red);color:#2a0606}.st.live{background:var(--amber);color:#2a1c00}
+.fold{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-top:10px}.fold summary{list-style:none;display:flex;justify-content:space-between;padding:14px 16px;font-weight:800;cursor:pointer}.fold summary::-webkit-details-marker{display:none}.fold summary::after{content:"›";color:var(--dim);transform:rotate(90deg);transition:.2s}.fold[open] summary::after{transform:rotate(270deg)}.fold .cnt{color:var(--dim);font-weight:600;margin-left:auto;margin-right:10px}.fin{padding:0 8px 8px}
 .filters{display:flex;gap:6px}.filters button{flex:1;background:var(--bg2);border:1px solid var(--line);color:var(--dim);font:700 13px inherit;padding:9px 4px;border-radius:10px}.filters button.on{color:var(--ink);border-color:var(--ink)}
 .empty{background:var(--panel);border:1px dashed var(--line);border-radius:14px;padding:18px;color:var(--dim);text-align:center}
 .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}.k{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
@@ -39,8 +51,10 @@ nav button{flex:1;background:none;border:0;color:var(--dim);font:800 15px inheri
 <header><h1 id="ttl">Today</h1><div class="upd" id="upd">loading…</div></header>
 
 <section id="vBoard">
-  <div class="filters"><button data-f="all" class="on">All</button><button data-f="nfl">NFL</button><button data-f="cfb">College</button><button data-f="plays">Plays only</button></div>
+  <div class="hero" id="hero"></div>
   <div id="games"></div>
+  <details class="fold" id="foldLeans"><summary><span>Leans</span><span class="cnt" id="nLeans"></span></summary><div class="fin" id="leans"></div></details>
+  <details class="fold" id="foldAll"><summary><span>Every other game</span><span class="cnt" id="nAll"></span></summary><div class="fin" id="others"></div></details>
 </section>
 
 <section id="vHist" hidden>
@@ -78,8 +92,8 @@ function verdict(g){
     if(pick&&f.rankclash&&pick.dir==="UNDER") why.push("Ranked vs ranked — these have leaned under the last three seasons.");
   } else {
     if(f.bothunder&&m.dir==="OVER"&&m.conf>=55){ pick={dir:"OVER",tier:"play",conf:Math.min(62,Math.max(58,m.conf))}; why.push(`Both teams' last game went under the total — NFL totals over-correct after that (over hit 55 / 59 / 63% the last three seasons) — and the model agrees at ${m.conf}%.`); }
-    else if((f.windy||f.wet)&&!g.indoor){ pick={dir:"UNDER",tier:"lean",conf:57}; why.push(`Weather: ${g.weather.gust} mph gusts, ${g.weather.precip}% rain. NFL weather unders are 7–1 this season, but historically swingy (71 / 43 / 61% by year) and the market has usually moved the total already.`); }
-    else if(m.conf>=58){ pick={dir:m.dir,tier:"lean",conf:Math.min(58,m.conf)}; why.push(`The totals model leans ${m.dir} at ${m.conf}%. The NFL model alone is lean-strength only.`); }
+    else if((f.windy||f.wet)&&!g.indoor&&!(m.conf>=58&&m.dir==="OVER")){ pick={dir:"UNDER",tier:m.conf>=58&&m.dir==="UNDER"?"play":"lean",conf:m.conf>=58&&m.dir==="UNDER"?Math.min(62,m.conf+1):57,half:true}; why.push(`Weather: ${g.weather.gust} mph gusts, ${g.weather.precip}% rain. NFL weather unders are 7–1 this season, but historically swingy (71 / 43 / 61% by year) and the market has usually moved the total already.`); }
+    else if(m.conf>=58){ pick={dir:m.dir,tier:"play",conf:Math.min(60,m.conf),half:true}; why.push(`The NFL totals model is ${m.conf}% on the ${m.dir}. At 58%+ it's 9–3 this season and was a small winner in each of the last three (55 / 57 / 52%) — $5 until it has a bigger sample.`); }
   }
   if(pick&&pick.dir==="OVER"&&f.windy){ why.push(`Skipped: ${g.weather.gust} mph gusts argue against an over.`); pick=null; }
   // SIDE: unranked team laying 21+ to an FCS school — the favorite covers (52–32 this season)
@@ -120,22 +134,41 @@ function gameCard(g){
       </table>`}
     </div></div>`;
 }
-function renderBoard(){
-  if(!UP){ return; }
-  let gs=UP.games.slice();
-  if(FILTER==="nfl"||FILTER==="cfb") gs=gs.filter(g=>g.lg===FILTER);
-  if(FILTER==="plays") gs=gs.filter(g=>verdict(g).tier==="play");
-  // plays first within each day, then leans, then the rest by kickoff
-  const rank=g=>({play:0,lean:1,none:2})[verdict(g).tier];
-  const days={}; gs.forEach(g=>{ (days[dayOf(g.date)]=days[dayOf(g.date)]||[]).push(g); });
-  const html=Object.entries(days).map(([d,list])=>{ list.sort((a,b)=>rank(a)-rank(b)||new Date(a.date)-new Date(b.date));
-    const n=list.filter(g=>verdict(g).tier==="play").length;
-    return `<div class="day">${d}${n?` · <span class="pos">${n} play${n>1?"s":""}</span>`:""}</div>`+list.map(gameCard).join(""); }).join("");
-  $("games").innerHTML=html||`<div class="empty">No games in the next 7 days match.</div>`;
-  $("upd").textContent="updated "+new Date(UP.generatedAt).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
+function playCard(g){
+  const v=verdict(g); const plays=[]; 
+  if(v.dir&&v.tier==="play") plays.push({lab:`${v.dir} ${g.total}`,conf:v.conf,r:result(g,v),amt:v.half?5:10,price:v.dir==="OVER"?g.overOdds:g.underOdds});
+  if(v.side&&v.side.tier==="play") plays.push({lab:`${v.side.team} ${v.side.line}`,conf:v.side.conf,r:sideResult(g,v.side),amt:10,price:null});
+  return plays.map(x=>`<div class="p" data-id="${g.id}"><div class="top">
+      <div class="ring ${x.r==="win"?"win":x.r==="loss"?"loss":""}" style="--v:${Math.round(x.conf)}"><b>${x.r==="win"?"✓":x.r==="loss"?"✗":Math.round(x.conf)+"%"}</b></div>
+      <div style="min-width:0"><div class="pick">${x.lab}${x.r==="live"?'<span class="st live">LIVE</span>':x.r==="win"?'<span class="st win">WON</span>':x.r==="loss"?'<span class="st loss">LOST</span>':""}</div>
+        <div class="game"><img src="${g.awayLogo||""}" alt=""> ${g.away} @ <img src="${g.homeLogo||""}" alt=""> ${g.home} · ${g.state==="pre"?tm(g.date):`${g.as}–${g.hs} ${g.state==="post"?"Final":"live"}`}${g.lg==="nfl"?" · NFL":""}</div></div>
+      <div class="amt"><b>$${x.amt}</b><div>${x.price!=null?(x.price>0?"+":"")+x.price:"-110"}</div></div></div>
+    <div class="an">${gameCard(g).split('<div class="an">')[1].replace(/<\/div><\/div>\s*$/,"")}</div></div>`).join("");
 }
-$("games").addEventListener("click",e=>{ const c=e.target.closest(".g"); if(c&&e.target.closest(".row")) c.classList.toggle("open"); });
-document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{ FILTER=b.dataset.f; document.querySelectorAll(".filters button").forEach(x=>x.classList.toggle("on",x===b)); renderBoard(); });
+function renderBoard(){
+  if(!UP) return;
+  const gs=UP.games.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const tier=g=>{ const v=verdict(g); return (v.tier==="play"||(v.side&&v.side.tier==="play"))?"play":v.tier; };
+  const plays=gs.filter(g=>tier(g)==="play"), leans=gs.filter(g=>tier(g)==="lean"), rest=gs.filter(g=>tier(g)==="none");
+  const days={}; plays.forEach(g=>{ (days[dayOf(g.date)]=days[dayOf(g.date)]||[]).push(g); });
+  const todayKey=dayOf(new Date()); const nToday=(days[todayKey]||[]).length;
+  $("hero").innerHTML=`<div><div class="big">${plays.length}</div><div class="lab">plays in the next 7 days${nToday?` · <b style="color:var(--green)">${nToday} today</b>`:""}</div></div><div class="rec" id="heroRec"><b>—</b>season at $10/play</div>`;
+  $("games").innerHTML=Object.entries(days).map(([d,list])=>`<div class="day">${d===todayKey?"Today":d}</div>`+list.map(playCard).join("")).join("")||`<div class="empty">No plays right now. The model only calls a game when it's measured to be right — check back as lines post.</div>`;
+  $("nLeans").textContent=leans.length; $("leans").innerHTML=leans.map(gameCard).join("")||'<div class="dim" style="padding:8px">None.</div>';
+  $("nAll").textContent=rest.length; $("others").innerHTML=rest.map(gameCard).join("");
+  $("upd").textContent="updated "+new Date(UP.generatedAt).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
+  heroRecord();
+}
+async function heroRecord(){
+  try{ const d=await (await fetch("/api/record",{cache:"no-store"})).json(); const g=(d.records||[]).filter(r=>r.graded&&!r.live);
+    const dirs={}; g.forEach(r=>{ (dirs[r.gameId]=dirs[r.gameId]||new Set()).add(r.dir); });
+    const ok=r=>!(dirs[r.gameId].has("OVER")&&dirs[r.gameId].has("UNDER"))&&!r.cats.includes("qbout")&&r.cats.some(c=>["mtotal","dogimp10","unrfavfcs","bothunder","wind","precip"].includes(c));
+    const rs=g.filter(ok); const v=rs.reduce((a,r)=>a+(r.result==="win"?100/11:r.result==="loss"?-10:0),0);
+    const el=$("heroRec"); if(el) el.innerHTML=`<b class="${v>=0?"pos":"neg"}">${money(v)}</b>${rs.filter(r=>r.result==="win").length}–${rs.filter(r=>r.result==="loss").length} season`; }catch(e){}
+}
+document.addEventListener("click",e=>{ const p=e.target.closest(".p"); if(p&&e.target.closest(".top")) p.classList.toggle("open"); });
+document.addEventListener("click",e=>{ const c=e.target.closest(".g"); if(c&&e.target.closest(".row")) c.classList.toggle("open"); });
+
 
 /* ---- history ---- */
 async function loadHistory(){
