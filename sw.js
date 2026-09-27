@@ -7,7 +7,7 @@
      a cached number is exactly the failure this whole tool exists to prevent.
 */
 const SHELL="edge-shell-v7";
-const SHELL_FILES=["/","/index.html","/intro","/intro.html","/manifest.webmanifest","/icon-192.png","/icon-512.png"];
+const SHELL_FILES=["/","/index.html","/board","/board.html","/intro","/intro.html","/manifest.webmanifest","/icon-192.png","/icon-512.png"];
 
 self.addEventListener("install",e=>{
   e.waitUntil(caches.open(SHELL).then(c=>c.addAll(SHELL_FILES.map(u=>new Request(u,{cache:"reload"})))).catch(()=>{}));

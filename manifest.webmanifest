@@ -1,14 +1,17 @@
 {
-  "name": "The Edge Board",
-  "short_name": "Edge Board",
-  "description": "Live NFL & college football betting edges — weather, injuries, line movement and market gaps, updating on their own.",
+  "name": "Edge",
+  "short_name": "Edge",
+  "description": "Live NFL & college football betting edges \u2014 weather, injuries, line movement and market gaps, updating on their own.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0a0e14",
   "theme_color": "#0a0e14",
-  "categories": ["sports", "utilities"],
+  "categories": [
+    "sports",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

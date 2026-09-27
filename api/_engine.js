@@ -7,8 +7,8 @@ const {fetchOne,fetchDetail}=require("./_espn.js");
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function loadScript(){
   let html=null;
-  try{ html=fs.readFileSync(path.join(process.cwd(),"index.html"),"utf8"); }catch(e){}
-  if(!html){ const r=await fetch("https://nfl-edge-kappa.vercel.app/index.html",{cache:"no-store"}); html=await r.text(); }
+  try{ html=fs.readFileSync(path.join(process.cwd(),"board.html"),"utf8"); }catch(e){}
+  if(!html){ const r=await fetch("https://nfl-edge-kappa.vercel.app/board.html",{cache:"no-store"}); html=await r.text(); }
   const script=[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(b=>b.includes("const state="));
   const j=script.lastIndexOf("})();");
   return script.slice(0,j)+"\nwindow.__ENG=()=>({state,recordStrongEdges,gradeRecords,migrateRecords,invalidateEdges,bestPlay,callNumber,isBusy:()=>detailRunning||detailQueue.length>0});\n"+script.slice(j);

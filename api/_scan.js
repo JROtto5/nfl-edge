@@ -1,7 +1,7 @@
 /* Upcoming-slate scanner: runs the board's fitted totals model (and the rule signals
    that held up) over EVERY NFL and college game kicking off in the next 7 days —
    not just the current Mon–Sun window — so next week's early lines show up on Sunday.
-   Features mirror feats_total() / modelTotalProb() exactly (see index.html). */
+   Features mirror feats_total() / modelTotalProb() exactly (see board.html). */
 const {fetchOne}=require("./_espn.js");
 const {readJSON,writeJSON}=require("./_store.js");
 const LOGIT=require("./_logit.json");
@@ -36,7 +36,10 @@ async function scan(){
     const weeks=[]; for(let w=1;w<=cw+1;w++) weeks.push(w);
     const all=(await pool(weeks,6,w=>weekEvents(lg,w))).flat().filter(Boolean);
     const past=all.filter(g=>g.state==="post").sort((a,b)=>new Date(a.date)-new Date(b.date));
-    const up=all.filter(g=>g.state==="pre"&&new Date(g.date).getTime()<=horizon);
+    // today's games in any state (so the day view shows live/final with results) + everything upcoming in 7 days
+    const etDay=t=>new Date(new Date(t).getTime()-4*3600e3).toISOString().slice(0,10);
+    const today=etDay(now);
+    const up=all.filter(g=>(g.state==="pre"&&new Date(g.date).getTime()<=horizon)||(etDay(g.date)===today));
     // closing totals for the last 3 games of every team in the upcoming slate (cached)
     const teams=new Set(up.flatMap(g=>[g.home,g.away]));
     const needIds=new Set(); const byTeam={};
@@ -50,7 +53,7 @@ async function scan(){
     const M=LOGIT[lg];
     up.forEach((g,i)=>{
       const o=upOdds[i]; if(!o||o.total==null||o.spread==null){ out.games.push({...g,noLine:true}); return; }
-      const hist=t=>(byTeam[t]||[]).map(x=>{ const mine=x.home===t?x.hs:x.as, theirs=x.home===t?x.as:x.hs; const tot=x.hs+x.as; const ln=cache[x.id]; return {pf:mine,pa:theirs,tot,ou:ln==null?null:(tot>ln?"O":tot<ln?"U":"P")}; });
+      const hist=t=>(byTeam[t]||[]).filter(x=>new Date(x.date)<new Date(g.date)).map(x=>{ const mine=x.home===t?x.hs:x.as, theirs=x.home===t?x.as:x.hs; const tot=x.hs+x.as; const ln=cache[x.id]; return {pf:mine,pa:theirs,tot,ou:ln==null?null:(tot>ln?"O":tot<ln?"U":"P")}; });
       const h=hist(g.home), a=hist(g.away);
       const av=(L,k)=>L.length?L.reduce((s,x)=>s+x[k],0)/L.length:26;
       const tot=o.total, sp=o.spread, hImp=(tot-sp)/2, aImp=tot-hImp, dogImp=Math.min(hImp,aImp);
@@ -67,7 +70,7 @@ async function scan(){
       out.games.push({...g,...o,dogImp:Math.round(dogImp*10)/10,model:{dir:mdir,conf:Math.round(conf*1000)/10},
         form:{home:{n:h.length,ppg:Math.round(av(h,"pf")*10)/10,pa:Math.round(av(h,"pa")*10)/10,lastOU:last(h).ou||null},away:{n:a.length,ppg:Math.round(av(a,"pf")*10)/10,pa:Math.round(av(a,"pa")*10)/10,lastOU:last(a).ou||null}},
         weather:wx[i]||null,
-        flags:{windy:!!(wx[i]&&wx[i].gust>=20),dogimp10:lg==="cfb"&&dogImp<=10,bothunder:!!(f.both_lastU&&h.length&&a.length),rankclash:!!f.both_r,hightotal:lg==="cfb"&&tot>=60,fcs}});
+        flags:{windy:!!(wx[i]&&wx[i].gust>=20),wet:!!(wx[i]&&wx[i].precip>=70),dogimp10:lg==="cfb"&&dogImp<=10,bothunder:!!(f.both_lastU&&h.length&&a.length),rankclash:!!f.both_r,hightotal:lg==="cfb"&&tot>=60,fcs}});
     });
   }
   const keys=Object.keys(cache); if(keys.length>4000) keys.slice(0,keys.length-4000).forEach(k=>delete cache[k]);
