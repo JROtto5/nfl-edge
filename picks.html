@@ -1,0 +1,135 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Edge Picks</title><meta name="theme-color" content="#0a0e14">
+<style>
+:root{--bg:#0a0e14;--panel:#111826;--bg2:#182233;--line:#243044;--ink:#e8edf5;--dim:#8a97ab;--green:#3ddc84;--red:#ff5d5d;--amber:#f5b942;--blue:#6aa8ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,-apple-system,sans-serif;padding:14px 12px 60px;max-width:760px;margin:0 auto}
+h1{font-size:24px;margin:0;letter-spacing:.01em}.sub{color:var(--dim);font-size:12px;margin:2px 0 14px}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:22px 0 8px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}.k{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.k .l{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}.k .v{font:800 28px/1.1 ui-monospace,monospace;margin:4px 0}.k .s{font-size:12px;color:var(--dim)}
+.pos{color:var(--green)}.neg{color:var(--red)}.dim{color:var(--dim)}.amb{color:var(--amber)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}th{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}td.n{text-align:right;font-family:ui-monospace,monospace;font-weight:700}
+.day{font-weight:800;margin:16px 0 6px;font-size:14px}
+.pick{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+.pick .m{font-size:12px;color:var(--dim)}.pick .m img{width:18px;height:18px;vertical-align:-4px}
+.pick .call{font:800 18px/1.2 inherit}.pick .why{grid-column:1/-1;font-size:12.5px;color:var(--dim)}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.06em;padding:3px 8px;border-radius:7px;border:1px solid}
+.tag.play{color:var(--green);border-color:var(--green)}.tag.lean{color:var(--amber);border-color:var(--amber)}.tag.nfl{color:var(--blue);border-color:var(--blue)}
+.stake{text-align:right}.stake b{font:800 20px ui-monospace,monospace}
+.seg{display:flex;gap:6px;margin:10px 0}.seg button{flex:1;background:var(--bg2);border:1px solid var(--line);color:var(--dim);font:700 13px inherit;padding:8px;border-radius:9px}.seg button.on{color:var(--ink);border-color:var(--ink)}
+svg{display:block;width:100%;height:auto}
+.note{font-size:12px;color:var(--dim);line-height:1.5}
+a{color:var(--blue)}
+</style></head><body>
+<h1>🎯 Edge Picks</h1>
+<div class="sub" id="upd">loading…</div>
+
+<div class="kpis">
+  <div class="k"><div class="l">College · proven plays</div><div class="v" id="kC">—</div><div class="s" id="kCs"></div></div>
+  <div class="k"><div class="l">NFL · all pregame calls</div><div class="v" id="kN">—</div><div class="s" id="kNs"></div></div>
+</div>
+<div class="card" style="margin-top:8px"><div class="note" style="margin-bottom:6px">Bankroll if every play was <b>$10</b> at -110, since opening weekend</div><div id="chart"></div></div>
+
+<h2>Everything the model says · next 7 days</h2>
+<div class="seg"><button data-f="all" class="on">All</button><button data-f="cfb">College</button><button data-f="nfl">NFL</button><button data-f="leans">+ Leans</button></div>
+<div id="picks"><div class="card dim">Scanning every game with a line…</div></div>
+
+<h2>Track record by signal · $10 a bet</h2>
+<div class="card" style="padding:4px 8px"><table id="groups"></table></div>
+
+<h2>How picks are chosen</h2>
+<div class="card note" id="rules">
+<b class="pos">PLAY — college:</b> the fitted totals model at ≥58% (tested 62.9 / 65.2 / 55.4% on seasons it never saw), or the underdog implied to score ≤10 → OVER (67% this season). Skipped when another signal points the opposite way on the same total, or when an OVER would be played into 20+ mph gusts.<br><br>
+<b class="nfl" style="color:var(--blue)">PLAY — NFL:</b> only when two measured signals agree: "both teams' last game went under → OVER" (55 / 59 / 63% the last three seasons) <i>and</i> the model on the same side at ≥55%. The NFL board is break-even this season, so NFL plays are rarer and stay at $10.<br><br>
+<b class="amb">LEAN:</b> model 55–58% in college, or ≥58% alone in the NFL. $5, or skip.<br><br>
+<b>Not on this page:</b> live in-game calls (losing money: 190–177), the college "60+ total → under" rule (8–12 this season), spreads (no side edge has held up), and anything built on "QB ruled out" (15–22).
+</div>
+<div class="note" style="margin:14px 2px">Full board with every signal: <a href="/">nfl-edge-kappa.vercel.app</a> · this page is reference math, nothing is placed · never bet what you can't afford to lose.</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const money=x=>(x<0?"−":"+")+"$"+Math.abs(x).toFixed(0);
+const win=r=>r.result==="win", loss=r=>r.result==="loss";
+const pnl=rs=>rs.reduce((a,r)=>a+(win(r)?100/11:loss(r)?-10:0),0);
+const rec=rs=>`${rs.filter(win).length}–${rs.filter(loss).length}${rs.some(r=>r.result==="push")?"–"+rs.filter(r=>r.result==="push").length:""}`;
+const et=d=>new Date(d).toLocaleString(undefined,{weekday:"short",hour:"numeric",minute:"2-digit"});
+let FILTER="all", UP=null;
+
+async function loadRecord(){
+  const d=await (await fetch("/api/record",{cache:"no-store"})).json();
+  const g=(d.records||[]).filter(r=>r.graded);
+  const dirs={}; g.forEach(r=>{ if(!r.live) (dirs[r.gameId]=dirs[r.gameId]||new Set()).add(r.dir); });
+  const contested=r=>dirs[r.gameId]&&dirs[r.gameId].has("OVER")&&dirs[r.gameId].has("UNDER");
+  const G={
+    cfbProven:g.filter(r=>!r.live&&r.lg==="cfb"&&!contested(r)&&(r.cats||[]).some(c=>c==="mtotal"||c==="dogimp10")),
+    cfbClean:g.filter(r=>!r.live&&r.lg==="cfb"&&!contested(r)),
+    cfbAll:g.filter(r=>!r.live&&r.lg==="cfb"),
+    nfl:g.filter(r=>!r.live&&r.lg==="nfl"),
+    model:g.filter(r=>!r.live&&(r.cats||[]).includes("mtotal")&&!contested(r)),
+    dogover:g.filter(r=>!r.live&&(r.cats||[]).includes("dogimp10")&&!contested(r)),
+    ht:g.filter(r=>!r.live&&(r.cats||[]).includes("hightotal")&&!contested(r)),
+    live:g.filter(r=>r.live), all:g
+  };
+  const c=pnl(G.cfbProven), n=pnl(G.nfl);
+  $("kC").textContent=money(c); $("kC").className="v "+(c>=0?"pos":"neg"); $("kCs").textContent=`${rec(G.cfbProven)} · ${G.cfbProven.length} bets · $${G.cfbProven.length*10} risked`;
+  $("kN").textContent=money(n); $("kN").className="v "+(n>=0?"pos":"neg"); $("kNs").textContent=`${rec(G.nfl)} · ${G.nfl.length} bets`;
+  const rows=[["College · model ≥58% or dog-over (proven)",G.cfbProven,true],["  ↳ fitted totals model",G.model],["  ↳ dog implied ≤10 → OVER",G.dogover],["College · every clean call",G.cfbClean],["College · every call incl. contested",G.cfbAll],["College · 60+ total → UNDER (demoted)",G.ht],["NFL · every pregame call",G.nfl],["Live in-game calls (not used)",G.live],["Everything the board logged",G.all]];
+  $("groups").innerHTML=`<tr><th>Signal group</th><th>Record</th><th style="text-align:right">$10/bet</th></tr>`+rows.map(([l,rs,b])=>{ const v=pnl(rs); return `<tr${b?' style="font-weight:800"':""}><td>${l}</td><td>${rec(rs)}</td><td class="n ${v>=0?"pos":"neg"}">${money(v)}</td></tr>`; }).join("");
+  chart(G.cfbProven,G.nfl);
+  $("upd").textContent=`record updated ${d.updatedAt?new Date(d.updatedAt).toLocaleString():"—"} · graded by the server every 10 min`;
+}
+function chart(a,b){
+  const series=rs=>{ let s=0; return rs.slice().sort((x,y)=>(x.kickoff||0)-(y.kickoff||0)).map(r=>({t:r.kickoff,v:(s+=win(r)?100/11:loss(r)?-10:0)})); };
+  const A=series(a),B=series(b); const all=[...A,...B]; if(!all.length){ $("chart").innerHTML='<div class="dim">no graded bets yet</div>'; return; }
+  const t0=Math.min(...all.map(p=>p.t)),t1=Math.max(...all.map(p=>p.t)); const lo=Math.min(0,...all.map(p=>p.v)),hi=Math.max(10,...all.map(p=>p.v));
+  const W=700,H=200,P=28; const x=t=>P+(W-2*P)*(t-t0)/Math.max(1,t1-t0), y=v=>H-P-(H-2*P)*(v-lo)/(hi-lo);
+  const path=S=>S.length?"M"+[[S[0].t,0],...S.map(p=>[p.t,p.v])].map(([t,v])=>`${x(t).toFixed(1)},${y(v).toFixed(1)}`).join("L"):"";
+  $("chart").innerHTML=`<svg viewBox="0 0 ${W} ${H}"><line x1="${P}" x2="${W-P}" y1="${y(0)}" y2="${y(0)}" stroke="#243044" stroke-dasharray="4 4"/>
+    <path d="${path(A)}" fill="none" stroke="#3ddc84" stroke-width="3"/><path d="${path(B)}" fill="none" stroke="#6aa8ff" stroke-width="2.5"/>
+    <text x="${W-P}" y="${y(A.at(-1)?.v??0)-6}" fill="#3ddc84" font-size="13" text-anchor="end" font-weight="800">College ${money(A.at(-1)?.v??0)}</text>
+    <text x="${W-P}" y="${y(B.at(-1)?.v??0)+16}" fill="#6aa8ff" font-size="13" text-anchor="end" font-weight="800">NFL ${money(B.at(-1)?.v??0)}</text>
+    <text x="${P}" y="${H-6}" fill="#8a97ab" font-size="11">${new Date(t0).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</text><text x="${W-P}" y="${H-6}" fill="#8a97ab" font-size="11" text-anchor="end">today</text></svg>`;
+}
+function verdict(g){
+  if(g.noLine) return null;
+  const m=g.model, f=g.flags, out=[];
+  if(g.lg==="cfb"){
+    if(m.conf>=58) out.push({dir:m.dir,tier:"play",why:`Fitted totals model <b>${m.conf}%</b> ${m.dir} — the strong tier (62.9 / 65.2 / 55.4% out-of-sample).`});
+    else if(m.conf>=55) out.push({dir:m.dir,tier:"lean",why:`Fitted totals model ${m.conf}% ${m.dir} — lean tier.`});
+    if(f.dogimp10){ const same=out.find(o=>o.dir==="OVER"); const why=`Underdog implied to score ~${g.dogImp} — garbage-time points in blowouts (41–20 this season).`; if(same){ same.tier="play"; same.why+=" "+why; } else out.push({dir:"OVER",tier:"play",why}); }
+    if(f.rankclash) out.forEach(o=>{ if(o.dir==="UNDER") o.why+=" Ranked vs ranked agrees (under)."; });
+  } else {
+    if(f.bothunder&&m.dir==="OVER"&&m.conf>=55) out.push({dir:"OVER",tier:"play",why:`Both teams' last game went under (→ OVER 55 / 59 / 63% the last three NFL seasons) and the model agrees at ${m.conf}%.`});
+    else if(m.conf>=58) out.push({dir:m.dir,tier:"lean",why:`NFL model ${m.conf}% ${m.dir}. The NFL model is lean-tier only (≈55% tested) and the NFL board is break-even this year.`});
+  }
+  // wind veto: 20+ mph gusts at kickoff argue UNDER — never back an OVER into it
+  if(f.windy){ const o=out.find(x=>x.dir==="OVER"); if(o) return null; out.forEach(x=>{ x.why+=` ${g.weather.gust} mph gusts forecast agree.`; }); }
+  const dirs=new Set(out.map(o=>o.dir)); if(dirs.size>1) return null;           // contested → skip
+  if(g.lg==="cfb"&&m.conf>=55&&out.length&&m.dir!==out[0].dir) return null;       // model disagrees → skip
+  return out[0]||null;
+}
+function renderPicks(){
+  if(!UP) return;
+  const rows=UP.games.map(g=>({g,v:verdict(g)})).filter(x=>x.v&&(FILTER==="leans"||x.v.tier==="play")&&(FILTER==="all"||FILTER==="leans"||x.g.lg===FILTER));
+  if(!rows.length){ $("picks").innerHTML=`<div class="card dim">Nothing qualifies right now — the model only speaks when it's measured to be right. ${UP.games.filter(g=>g.noLine).length} games are still waiting on lines; this re-scans every 20 minutes.</div>`; return; }
+  let html="", day="";
+  rows.forEach(({g,v})=>{
+    const d=new Date(g.date).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
+    if(d!==day){ day=d; html+=`<div class="day">${d}</div>`; }
+    const price=v.dir==="OVER"?g.overOdds:g.underOdds; const moved=g.openTotal!=null&&g.openTotal!==g.total;
+    const good=moved&&((v.dir==="UNDER"&&g.total>g.openTotal)||(v.dir==="OVER"&&g.total<g.openTotal));
+    html+=`<div class="card"><div class="pick">
+      <div><div class="m"><img src="${g.awayLogo||""}" alt=""> ${g.away} @ <img src="${g.homeLogo||""}" alt=""> ${g.home} · ${et(g.date)} · <span class="tag ${g.lg==="nfl"?"nfl":v.tier}">${g.lg==="nfl"?"NFL ":""}${v.tier.toUpperCase()}</span></div>
+        <div class="call">${v.dir} ${g.total} <span class="dim" style="font-size:13px;font-weight:600">${price!=null?(price>0?"+":"")+price:"-110"}</span></div></div>
+      <div class="stake"><b>$${v.tier==="play"?10:5}</b><div class="dim" style="font-size:11px">model ${g.model.conf}% ${g.model.dir}</div></div>
+      <div class="why">${v.why}${moved?` Opened ${g.openTotal} → now ${g.total}${good?' <span class="pos">(moved your way)</span>':""}.`:""} Scoring: ${g.away} ${g.form.away.ppg} for / ${g.form.away.pa} against, ${g.home} ${g.form.home.ppg} / ${g.form.home.pa}.</div>
+    </div></div>`;
+  });
+  const waiting=UP.games.filter(g=>g.noLine).length;
+  $("picks").innerHTML=html+(waiting?`<div class="note" style="margin:6px 2px">${waiting} upcoming games have no line posted yet — they'll appear as books open them.</div>`:"");
+}
+async function loadUpcoming(){ try{ UP=await (await fetch("/api/upcoming",{cache:"no-store"})).json(); renderPicks(); }catch(e){ $("picks").innerHTML='<div class="card neg">Couldn\'t reach the scanner — retrying.</div>'; } }
+document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{ FILTER=b.dataset.f; document.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on",x===b)); renderPicks(); }));
+loadRecord(); loadUpcoming(); setInterval(()=>{ loadRecord(); loadUpcoming(); },5*60e3);
+</script></body></html>

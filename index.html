@@ -1747,6 +1747,10 @@ function edgesForCompute(g){
     if(!e.dir||e.stacked||e.conflict) return;
     const pr=catProb(e.cat,g.lg);
     const st=pr.src==="live"?(state.learned||{})[e.cat]:(BACKTEST_2025[g.lg]||{})[e.cat];
+    // THIS SEASON'S own record overrides history on the downside faster: a strong call whose
+    // live graded record is below 48% on 20+ calls is held at lean (e.g. NFL "QB ruled out"
+    // went 15-22 in 2026 while its prior still said strong).
+    if(pr.src==="live"&&st&&st.n>=20&&pr.p<48&&e.k==="strong"){ e.k="lean"; e.why+=` <b>Held at lean:</b> this season it's ${pr.p}% on ${st.n} graded calls.`; }
     if(pr.src!=="prior"&&st&&st.n>=40){
       // 100+ games to be promoted to strong, unless both leagues agree on the signal
       const enough=st.n>=100||CROSS_LEAGUE_CATS.has(e.cat);

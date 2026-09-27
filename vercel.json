@@ -29,6 +29,10 @@
     "api/tick.js": {
       "maxDuration": 60,
       "includeFiles": "index.html"
+    },
+    "api/upcoming.js": {
+      "maxDuration": 60,
+      "includeFiles": "api/_logit.json"
     }
   }
 }
