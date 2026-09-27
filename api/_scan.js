@@ -13,7 +13,7 @@ async function pool(items,n,fn){ const out=new Array(items.length); let i=0; awa
 async function weekEvents(lg,wk){
   const d=await fetchOne(`${SITE[lg]}/scoreboard?seasontype=2&week=${wk}&dates=2026&limit=500${lg==="cfb"?"&groups=80":""}`);
   return ((d&&d.events)||[]).map(e=>{ const c=e.competitions[0]; const h=c.competitors.find(x=>x.homeAway==="home"), a=c.competitors.find(x=>x.homeAway==="away");
-    return {id:e.id,lg,wk,date:e.date,state:c.status.type.state,home:h.team.abbreviation,away:a.team.abbreviation,homeLogo:h.team.logo,awayLogo:a.team.logo,
+    return {id:e.id,lg,wk,date:e.date,state:c.status.type.state,home:h.team.abbreviation,away:a.team.abbreviation,homeLogo:h.team.logo,awayLogo:a.team.logo,homeColor:h.team.color||null,awayColor:a.team.color||null,homeAlt:h.team.alternateColor||null,awayAlt:a.team.alternateColor||null,homeName:h.team.shortDisplayName||h.team.displayName||null,awayName:a.team.shortDisplayName||a.team.displayName||null,
       hs:Number(h.score||0),as:Number(a.score||0),hr:(h.curatedRank||{}).current,ar:(a.curatedRank||{}).current,hc:h.team.conferenceId,ac:a.team.conferenceId,
       neutral:!!c.neutralSite,indoor:!!(c.venue||{}).indoor}; });
 }
