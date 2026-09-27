@@ -165,13 +165,19 @@ function verdict(g){
   } else {
     if(f.bothunder&&m.dir==="OVER"&&m.conf>=55){ pick={dir:"OVER",tier:"play",conf:Math.min(62,Math.max(58,m.conf))}; why.push(`Both teams' last game went under the total — NFL totals over-correct after that (over hit 55 / 59 / 63% the last three seasons) — and the model agrees at ${m.conf}%.`); }
     else if((f.windy||f.wet)&&!g.indoor&&!(m.conf>=58&&m.dir==="OVER")){ pick={dir:"UNDER",tier:m.conf>=58&&m.dir==="UNDER"?"play":"lean",conf:m.conf>=58&&m.dir==="UNDER"?Math.min(62,m.conf+1):57,half:true}; why.push(`Weather: ${g.weather.gust} mph gusts, ${g.weather.precip}% rain. NFL weather unders are 7–1 this season, but historically swingy (71 / 43 / 61% by year) and the market has usually moved the total already.`); }
+    else if(f.bothunder&&!(m.dir==="UNDER"&&m.conf>=55)&&!f.windy){ pick={dir:"OVER",tier:"lean",conf:57}; why.push(`Both teams' last game went under the total. NFL totals over-correct after that: over hit 55 / 59 / 63% the last three seasons. The old board called this strong (58%); it's a lean here because the model doesn't back it (${m.conf}% ${m.dir}) and it's only 2–3 when re-checked on 2026 games.`); }
     else if(m.conf>=58){ pick={dir:m.dir,tier:"play",conf:Math.min(60,m.conf),half:true}; why.push(`The NFL totals model is ${m.conf}% on the ${m.dir}. At 58%+ it's 9–3 this season and was a small winner in each of the last three (55 / 57 / 52%) — $5 until it has a bigger sample.`); }
   }
   if(pick&&pick.dir==="OVER"&&f.windy){ why.push(`Skipped: ${g.weather.gust} mph gusts argue against an over.`); pick=null; }
   let side=null;
+  if(g.lg==="nfl"&&g.spread!=null){ const a=Math.abs(g.spread), dog=g.spread>0?g.home:g.away, favT=g.spread<0?g.home:g.away;
+    const o=g.openSpread!=null?Math.abs(g.openSpread):null, crossed=o!=null&&a>o&&[3,7].some(k=>o<k&&a>=k);
+    if(crossed){ side={team:dog,line:+a,tier:"lean",conf:56}; why.push(`<b>Side lean:</b> the line moved through ${o<3&&a>=3?"3":"7"} toward the favorite (${o} → ${a}). Dogs getting a key number this way: 58% the last two seasons, 5–1 this season.`); }
+    else if(a>=7&&a<=9.5){ side={team:dog,line:+a,tier:"lean",conf:56}; why.push(`<b>Side lean:</b> NFL dogs of +7 to +9.5 covered 57% the last three seasons and are 5–2 this season.`); }
+    else if(a>=0.5&&a<=2.5){ side={team:favT,line:-a,tier:"lean",conf:55}; why.push(`<b>Side lean:</b> small NFL favorites (0.5–2.5) covered 55% the last three seasons and are 5–1 this season.`); } }
   if(f.unrfavfcs){ side={team:g.fav,line:-Math.abs(g.spread),tier:"play",conf:60}; why.push(`<b>Side:</b> ${g.fav} is unranked and laying ${Math.abs(g.spread)} to an FCS school. Unranked favorites keep their foot down in these games — the favorite has covered 52–32 (62%) this season.`); }
   if(!pick&&!side) return {tier:"none",why:why.length?why:["Nothing measured says this line is off — the book's number looks fair."]};
-  if(!pick) return {tier:side.tier,conf:side.conf,dir:null,side,why};
+  if(!pick) return {tier:side.tier==="play"?"play":"none",conf:side.conf,dir:null,side,why};
   return {...pick,side,why};
 }
 function sideResult(g,s){ if(!s||g.state==="pre") return null; if(g.state==="in") return "live"; const cm=(g.hs-g.as)+g.spread; if(cm===0) return "push"; return ((cm>0)===(s.team===g.home))?"win":"loss"; }
@@ -213,7 +219,7 @@ function cardHtml(x,i){ const g=x.g;
 function miniHtml(g){ const v=verdict(g);
   return `<div class="mini"><div class="top"><div class="logos"><img src="${g.awayLogo||""}" alt=""><img src="${g.homeLogo||""}" alt=""></div>
     <div class="t">${g.away} @ ${g.home}<small>${whenTxt(g)}${g.lg==="nfl"?" · NFL":""}</small></div>
-    <div class="r">${v.tier==="lean"&&v.dir?`${v.dir} ${g.total}<small>LEAN ${Math.round(v.conf)}%</small>`:g.noLine?`<small>NO LINE</small>`:`<small>NO PLAY</small>`}</div></div>
+    <div class="r">${[v.tier==="lean"&&v.dir?`${v.dir} ${g.total}<small>LEAN ${Math.round(v.conf)}%</small>`:"",v.side&&v.side.tier==="lean"?`${v.side.team} ${v.side.line>0?"+":""}${v.side.line}<small>LEAN ${v.side.conf}%</small>`:""].filter(Boolean).join("<br>")||(g.noLine?`<small>NO LINE</small>`:`<small>NO PLAY</small>`)}</div></div>
     <div class="an"><div>${analysis(g)}</div></div></div>`; }
 
 function renderBoard(){
@@ -231,7 +237,8 @@ function renderBoard(){
   const best=list[0]||null;   // best bet = the highest-confidence play on the selected day
   $("hero").innerHTML=best?heroHtml(best):"";
   $("games").innerHTML=list.length?list.filter(x=>x!==best).map(cardHtml).join(""):`<div class="empty"><b>No plays yet</b>The model only calls a game when it's measured to be right. Lines are still posting — check back.</div>`;
-  const leans=gs.filter(g=>{ const v=verdict(g); return v.tier==="lean"&&!playsOf(g).length; }), rest=gs.filter(g=>verdict(g).tier==="none");
+  const isLean=g=>{ const v=verdict(g); return !playsOf(g).length&&(v.tier==="lean"||(v.side&&v.side.tier==="lean")); };
+  const leans=gs.filter(isLean), rest=gs.filter(g=>!playsOf(g).length&&!isLean(g));
   $("nLeans").textContent=leans.length; $("leans").innerHTML=leans.map(miniHtml).join("")||'<div class="dim" style="padding:12px">None right now.</div>';
   $("nAll").textContent=rest.length; $("others").innerHTML=rest.map(miniHtml).join("");
   $("upd").textContent="updated "+tm(UP.generatedAt);
