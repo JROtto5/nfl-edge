@@ -70,7 +70,10 @@ async function scan(){
       out.games.push({...g,...o,dogImp:Math.round(dogImp*10)/10,model:{dir:mdir,conf:Math.round(conf*1000)/10},
         form:{home:{n:h.length,ppg:Math.round(av(h,"pf")*10)/10,pa:Math.round(av(h,"pa")*10)/10,lastOU:last(h).ou||null},away:{n:a.length,ppg:Math.round(av(a,"pf")*10)/10,pa:Math.round(av(a,"pa")*10)/10,lastOU:last(a).ou||null}},
         weather:wx[i]||null,
-        flags:{windy:!!(wx[i]&&wx[i].gust>=20),wet:!!(wx[i]&&wx[i].precip>=70),dogimp10:lg==="cfb"&&dogImp<=10,bothunder:!!(f.both_lastU&&h.length&&a.length),rankclash:!!f.both_r,hightotal:lg==="cfb"&&tot>=60,fcs}});
+        fav:sp<0?g.home:g.away, dog:sp<0?g.away:g.home,
+        flags:{windy:!!(wx[i]&&wx[i].gust>=20),wet:!!(wx[i]&&wx[i].precip>=70),
+          unrfavfcs:lg==="cfb"&&!rk(g.hr)&&!rk(g.ar)&&Math.abs(sp)>=21&&(()=>{ const dc=sp<0?g.ac:g.hc; return dc!=null&&!FBS.has(Number(dc)); })(),
+          lowlast:!!(h.length&&a.length&&(last(h).tot<=30||last(a).tot<=30)),dogimp10:lg==="cfb"&&dogImp<=10,bothunder:!!(f.both_lastU&&h.length&&a.length),rankclash:!!f.both_r,hightotal:lg==="cfb"&&tot>=60,fcs}});
     });
   }
   const keys=Object.keys(cache); if(keys.length>4000) keys.slice(0,keys.length-4000).forEach(k=>delete cache[k]);

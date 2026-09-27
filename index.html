@@ -72,7 +72,9 @@ function verdict(g){
   if(g.lg==="cfb"){
     if(f.dogimp10&&!(m.dir==="UNDER"&&m.conf>=55)){ pick={dir:"OVER",tier:"play",conf:Math.max(60,m.dir==="OVER"?m.conf:0)}; why.push(`Big mismatch: the underdog is expected to score only ~${g.dogImp}. Backups and garbage-time scores push these over — this signal is 41–20 this season.`); }
     if(m.conf>=58&&(!pick||pick.dir===m.dir)){ pick={dir:m.dir,tier:"play",conf:Math.max(pick?pick.conf:0,Math.min(65,m.conf))}; why.push(`The totals model is ${m.conf}% on the ${m.dir} — its strongest tier, which hit ~60% on seasons it had never seen.`); }
-    else if(!pick&&m.conf>=55){ pick={dir:m.dir,tier:"lean",conf:m.conf}; why.push(`The totals model leans ${m.dir} at ${m.conf}% — not strong enough to call a play.`); }
+    else if(!pick&&m.conf>=55){ pick={dir:m.dir,tier:"play",conf:m.conf}; why.push(`The totals model is ${m.conf}% on the ${m.dir}. This 55–58% tier has gone 36–24 (60%) in college this season.`); }
+    else if(!pick&&m.conf>=52&&f.lowlast&&m.dir==="OVER"){ pick={dir:"OVER",tier:"lean",conf:55}; why.push(`A team is coming off a ≤30-point game (college overs after that: 15–9 this season) and the model tilts over at ${m.conf}%.`); }
+    if(pick&&pick.dir==="OVER"&&f.lowlast&&pick.tier==="play") why.push("One of these teams just played a ≤30-point game — totals over-correct after those (15–9 this season).");
     if(pick&&f.rankclash&&pick.dir==="UNDER") why.push("Ranked vs ranked — these have leaned under the last three seasons.");
   } else {
     if(f.bothunder&&m.dir==="OVER"&&m.conf>=55){ pick={dir:"OVER",tier:"play",conf:Math.min(62,Math.max(58,m.conf))}; why.push(`Both teams' last game went under the total — NFL totals over-correct after that (over hit 55 / 59 / 63% the last three seasons) — and the model agrees at ${m.conf}%.`); }
@@ -80,9 +82,14 @@ function verdict(g){
     else if(m.conf>=58){ pick={dir:m.dir,tier:"lean",conf:Math.min(58,m.conf)}; why.push(`The totals model leans ${m.dir} at ${m.conf}%. The NFL model alone is lean-strength only.`); }
   }
   if(pick&&pick.dir==="OVER"&&f.windy){ why.push(`Skipped: ${g.weather.gust} mph gusts argue against an over.`); pick=null; }
-  if(!pick) return {tier:"none",why:why.length?why:["Nothing measured says this line is off — the book's number looks fair."]};
-  return {...pick,why};
+  // SIDE: unranked team laying 21+ to an FCS school — the favorite covers (52–32 this season)
+  let side=null;
+  if(f.unrfavfcs){ side={team:g.fav,line:-Math.abs(g.spread),tier:"play",conf:60}; why.push(`<b>Side:</b> ${g.fav} is unranked and laying ${Math.abs(g.spread)} to an FCS school. Unranked favorites keep their foot down in these games — the favorite has covered 52–32 (62%) this season.`); }
+  if(!pick&&!side) return {tier:"none",why:why.length?why:["Nothing measured says this line is off — the book's number looks fair."]};
+  if(!pick) return {tier:side.tier,conf:side.conf,dir:null,side,why};
+  return {...pick,side,why};
 }
+function sideResult(g,s){ if(!s||g.state==="pre") return null; if(g.state==="in") return "live"; const cm=(g.hs-g.as)+g.spread; if(cm===0) return "push"; return ((cm>0)===(s.team===g.home))?"win":"loss"; }
 function result(g,v){
   if(!v.dir||g.total==null) return null; const t=g.hs+g.as;
   if(g.state==="post") return t===g.total?"push":((t>g.total)===(v.dir==="OVER")?"win":"loss");
@@ -92,7 +99,8 @@ function gameCard(g){
   const v=verdict(g), r=result(g,v), price=v.dir==="OVER"?g.overOdds:v.dir==="UNDER"?g.underOdds:null;
   const score=g.state!=="pre"?`${g.away} ${g.as}–${g.hs} ${g.home} · ${g.state==="post"?"Final":"Live"}`:`${tm(g.date)}${g.lg==="nfl"?" · NFL":""}`;
   const right=v.tier==="none"?`<span class="badge none">NO PLAY</span>`:
-    `<span class="badge ${r==="win"?"win":r==="loss"?"loss":r==="live"?"live":v.tier}">${r==="win"?"WON":r==="loss"?"LOST":r==="live"?"LIVE":v.tier==="play"?"PLAY":"LEAN"}</span><div class="call">${v.dir} ${g.total}</div><div class="conf ${v.tier==="play"?"pos":"dim"}">${Math.round(v.conf)}% confident</div>`;
+    [v.dir?{lab:`${v.dir} ${g.total}`,r,tier:v.tier,conf:v.conf}:null, v.side?{lab:`${v.side.team} ${v.side.line}`,r:sideResult(g,v.side),tier:v.side.tier,conf:v.side.conf}:null].filter(Boolean).map(x=>
+    `<div style="margin-bottom:4px"><span class="badge ${x.r==="win"?"win":x.r==="loss"?"loss":x.r==="live"?"live":x.tier}">${x.r==="win"?"WON":x.r==="loss"?"LOST":x.r==="live"?"LIVE":x.tier==="play"?"PLAY":"LEAN"}</span><div class="call">${x.lab}</div><div class="conf ${x.tier==="play"?"pos":"dim"}">${Math.round(x.conf)}% confident</div></div>`).join("");
   const f=g.form||{home:{},away:{}}, w=g.weather;
   const moved=g.openTotal!=null&&g.openTotal!==g.total;
   return `<div class="g ${v.tier}" data-id="${g.id}"><div class="row">
@@ -103,7 +111,7 @@ function gameCard(g){
       ${g.noLine?"":`<h4>The numbers</h4><table>
         <tr><td>Total</td><td>${g.total}${moved?` <span class="dim">(opened ${g.openTotal})</span>`:""}</td></tr>
         <tr><td>Spread</td><td>${g.spread>0?g.away:g.home} ${-Math.abs(g.spread)}</td></tr>
-        ${price!=null?`<tr><td>Price on the ${v.dir.toLowerCase()}</td><td>${price>0?"+":""}${price}</td></tr>`:""}
+        ${price!=null&&v.dir?`<tr><td>Price on the ${v.dir.toLowerCase()}</td><td>${price>0?"+":""}${price}</td></tr>`:""}
         <tr><td>Model</td><td>${g.model.conf}% ${g.model.dir}</td></tr>
         <tr><td>${g.away} scoring (for / against)</td><td>${f.away.ppg??"—"} / ${f.away.pa??"—"}</td></tr>
         <tr><td>${g.home} scoring (for / against)</td><td>${f.home.ppg??"—"} / ${f.home.pa??"—"}</td></tr>
@@ -136,7 +144,7 @@ async function loadHistory(){
   const dirs={}; g.forEach(r=>{ (dirs[r.gameId]=dirs[r.gameId]||new Set()).add(r.dir); });
   const contested=r=>dirs[r.gameId].has("OVER")&&dirs[r.gameId].has("UNDER");
   const W=r=>r.result==="win", L=r=>r.result==="loss", P=rs=>rs.reduce((a,r)=>a+(W(r)?100/11:L(r)?-10:0),0), rec=rs=>`${rs.filter(W).length}–${rs.filter(L).length}`;
-  const cfb=g.filter(r=>r.lg==="cfb"&&!contested(r)&&r.cats.some(c=>c==="mtotal"||c==="dogimp10"));
+  const cfb=g.filter(r=>r.lg==="cfb"&&!contested(r)&&r.cats.some(c=>c==="mtotal"||c==="dogimp10"||c==="unrfavfcs"));
   const nfl=g.filter(r=>r.lg==="nfl"&&!r.cats.includes("qbout")&&r.cats.some(c=>["bothunder","wind","precip","mtotal"].includes(c)));
   const set=(id,rs)=>{ const v=P(rs); $(id).textContent=money(v); $(id).className="big "+(v>=0?"pos":"neg"); $(id+"s").textContent=`${rec(rs)} · ${rs.length} plays`; };
   set("hC",cfb); set("hN",nfl);
