@@ -142,7 +142,7 @@ nav button.on{background:var(--ink);color:#07090f}
   <div class="foot">Every 2026 game run through today's exact rules, using only what was known before kickoff, graded at the closing line and price. Stakes as shown ($10, $5 on NFL model plays). Some rules were tuned on this season's data, so expect the real rate to settle nearer 57–60%. · <a href="/board">full analysis board</a></div>
 </section>
 
-<nav><button data-v="board" class="on">Today</button><button data-v="hist">History</button></nav>
+<nav><button data-v="board" class="on">Today</button><button data-v="hist">History</button><button data-v="poll" onclick="location.href='/power'">Poll</button></nav>
 
 <script src="/verdict.js"></script>
 <script>
@@ -256,10 +256,10 @@ async function loadHistory(){
   $("bysig").innerHTML=types.map(([l,rs])=>{ const x=pl(rs); return `<div class="hrow"><div class="dot ${x>=0?"w":"l"}">${x>=0?"▲":"▼"}</div><div class="t">${l}<small>${rt(rs)} · ${Math.round(100*rs.filter(W).length/Math.max(1,rs.filter(r=>W(r)||L(r)).length))}% hit</small></div><div class="m ${x>=0?"pos":"neg"}">${money(x)}</div></div>`; }).join("");
   $("recent").innerHTML=P.slice().reverse().slice(0,40).map(r=>`<div class="hrow"><div class="dot ${W(r)?"w":L(r)?"l":"p"}">${W(r)?"W":L(r)?"L":"P"}</div><div class="t">${r.pick}<small>${r.away} ${r.as}–${r.hs} ${r.home} · ${new Date(r.date).toLocaleDateString([], {month:"short",day:"numeric"})} · ${r.conf}%${r.lg==="nfl"?" · NFL":""}</small></div><div class="m ${W(r)?"pos":L(r)?"neg":"dim"}">${W(r)?"+$"+win(r).toFixed(0):L(r)?"−$"+r.amt:"$0"}</div></div>`).join("")||'<div class="dim">No graded plays yet.</div>';
 }
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{ document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b)); const h=b.dataset.v==="hist";
+document.querySelectorAll("nav button[data-v=board],nav button[data-v=hist]").forEach(b=>b.onclick=()=>{ document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b)); const h=b.dataset.v==="hist";
   $("vBoard").hidden=h; $("vHist").hidden=!h; $("sub").textContent=h?"season results":"today's plays"; window.scrollTo({top:0,behavior:"smooth"}); if(h) loadHistory(); });
 async function loadUp(){ try{ UP=await (await fetch("/api/upcoming",{cache:"no-store"})).json(); renderBoard(); }catch(e){ $("upd").textContent="reconnecting"; } }
-loadUp(); strip(); setInterval(()=>{ loadUp(); REC=null; strip(); },3*60e3);
+loadUp(); strip(); if(location.hash==="#hist") document.querySelector("nav button[data-v=hist]").click(); setInterval(()=>{ loadUp(); REC=null; strip(); },3*60e3);
 setInterval(()=>{ const h=document.querySelector(".hero .tag"); if(h&&UP) renderBoard(); },60e3);
 if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
 </script></body></html>

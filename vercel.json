@@ -37,12 +37,20 @@
     "api/applog.js": {
       "maxDuration": 60,
       "includeFiles": "{api/_logit.json,verdict.js}"
+    },
+    "api/power.js": {
+      "maxDuration": 60,
+      "includeFiles": "api/_logit.json"
     }
   },
   "rewrites": [
     {
       "source": "/pro",
       "destination": "/board.html"
+    },
+    {
+      "source": "/poll",
+      "destination": "/power.html"
     }
   ]
 }

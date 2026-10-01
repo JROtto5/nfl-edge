@@ -6,8 +6,8 @@
      an old weather reading would be worse than showing nothing — a bettor acting on
      a cached number is exactly the failure this whole tool exists to prevent.
 */
-const SHELL="edge-shell-v9";
-const SHELL_FILES=["/","/index.html","/board","/board.html","/verdict.js","/intro","/intro.html","/manifest.webmanifest","/icon-192.png","/icon-512.png"];
+const SHELL="edge-shell-v10";
+const SHELL_FILES=["/","/index.html","/board","/board.html","/verdict.js","/intro","/intro.html","/power","/power.html","/manifest.webmanifest","/icon-192.png","/icon-512.png"];
 
 self.addEventListener("install",e=>{
   e.waitUntil(caches.open(SHELL).then(c=>c.addAll(SHELL_FILES.map(u=>new Request(u,{cache:"reload"})))).catch(()=>{}));
