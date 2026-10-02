@@ -138,6 +138,7 @@ nav button.on{background:var(--ink);color:#07090f}
   <div class="hcard"><div class="hl">Every play this app makes · 2026</div><div class="big" id="hTot">—</div><div class="dim" id="hTots" style="margin-top:8px;font-weight:600"></div><div id="chart" style="margin-top:14px"></div></div>
   <div class="hcard split"><div><div class="hl">College</div><div class="v" id="hC">—</div><div class="s" id="hCs"></div></div><div><div class="hl">NFL</div><div class="v" id="hN">—</div><div class="s" id="hNs"></div></div></div>
   <div class="hcard"><div class="hl">Recent plays</div><div id="recent"></div></div>
+  <div class="hcard"><div class="hl">Your plan · 60%+ only vs the whole 55%+ pool · since Oct 3</div><div id="plan"></div></div>
   <div class="hcard"><div class="hl">What's working</div><div id="bysig"></div></div>
   <div class="foot">Every 2026 game run through today's exact rules, using only what was known before kickoff, graded at the closing line and price. Stakes as shown ($10, $5 on NFL model plays). Some rules were tuned on this season's data, so expect the real rate to settle nearer 57–60%. · <a href="/board">full analysis board</a></div>
 </section>
@@ -253,6 +254,13 @@ async function loadHistory(){
     $("chart").innerHTML=`<svg viewBox="0 0 ${Wd} ${H}" style="width:100%;height:auto;overflow:visible"><defs><linearGradient id="ar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34f5a0" stop-opacity=".45"/><stop offset="1" stop-color="#34f5a0" stop-opacity="0"/></linearGradient></defs><line x1="0" x2="${Wd}" y1="${y(0)}" y2="${y(0)}" stroke="#ffffff22" stroke-dasharray="3 5"/><path d="M0,${y(0)} L${line} L${Wd},${y(0)} Z" fill="url(#ar)"/><path d="M${line}" fill="none" stroke="#34f5a0" stroke-width="3" stroke-linejoin="round"/><circle cx="${x(S.at(-1).t)}" cy="${y(S.at(-1).v)}" r="5" fill="#34f5a0"/></svg>`; }
   // what's working: by play type
   const types=[["College · fitted model totals",P.filter(r=>r.lg==="cfb"&&r.kind==="total")],["College · FCS favorite (side)",P.filter(r=>r.kind==="side")],["NFL · totals",N]];
+  // the plan test: from conference play on, does betting only 60%+ beat betting everything 55%+?
+  const PLAN_START=new Date("2026-10-03T04:00:00Z"), since=P.filter(r=>new Date(r.date)>=PLAN_START);
+  const hi=since.filter(r=>r.conf>=60), lo=since.filter(r=>r.conf<60);
+  const pr=(l,rs,note)=>{ const x=pl(rs), n=rs.filter(r=>W(r)||L(r)).length; return `<div class="hrow"><div class="dot ${n?(x>=0?"w":"l"):"p"}">${n?(x>=0?"▲":"▼"):"·"}</div><div class="t">${l}<small>${n?`${rt(rs)} · ${Math.round(100*rs.filter(W).length/n)}% hit`:"no graded plays yet"} · ${note}</small></div><div class="m ${x>=0?"pos":"neg"}">${money(x)}</div></div>`; };
+  const nG=since.filter(r=>W(r)||L(r)).length, xh=pl(hi), xa=pl(since);
+  $("plan").innerHTML=pr("60%+ only (your plan)",hi,`${hi.length} plays`)+pr("55–59% (the extra plays)",lo,`${lo.length} plays`)+pr("Everything 55%+",since,`${since.length} plays`)
+    +`<div class="dim" style="font-size:12.5px;margin-top:8px">${nG<30?`Verdict after 30 graded plays (${nG} so far). Small samples swing hard, so don't switch on a good or bad weekend.`:xa-xh>20&&pl(lo)>0?"The broader pool is earning more. The 55–59% plays are adding profit, so consider betting them too.":"Sticking to 60%+ is holding up. The extra plays aren't adding enough to be worth the risk."}</div>`;
   $("bysig").innerHTML=types.map(([l,rs])=>{ const x=pl(rs); return `<div class="hrow"><div class="dot ${x>=0?"w":"l"}">${x>=0?"▲":"▼"}</div><div class="t">${l}<small>${rt(rs)} · ${Math.round(100*rs.filter(W).length/Math.max(1,rs.filter(r=>W(r)||L(r)).length))}% hit</small></div><div class="m ${x>=0?"pos":"neg"}">${money(x)}</div></div>`; }).join("");
   $("recent").innerHTML=P.slice().reverse().slice(0,40).map(r=>`<div class="hrow"><div class="dot ${W(r)?"w":L(r)?"l":"p"}">${W(r)?"W":L(r)?"L":"P"}</div><div class="t">${r.pick}<small>${r.away} ${r.as}–${r.hs} ${r.home} · ${new Date(r.date).toLocaleDateString([], {month:"short",day:"numeric"})} · ${r.conf}%${r.lg==="nfl"?" · NFL":""}</small></div><div class="m ${W(r)?"pos":L(r)?"neg":"dim"}">${W(r)?"+$"+win(r).toFixed(0):L(r)?"−$"+r.amt:"$0"}</div></div>`).join("")||'<div class="dim">No graded plays yet.</div>';
 }
