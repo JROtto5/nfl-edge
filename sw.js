@@ -6,7 +6,7 @@
      an old weather reading would be worse than showing nothing — a bettor acting on
      a cached number is exactly the failure this whole tool exists to prevent.
 */
-const SHELL="edge-shell-v10";
+const SHELL="edge-shell-v11";
 const SHELL_FILES=["/","/index.html","/board","/board.html","/verdict.js","/intro","/intro.html","/power","/power.html","/manifest.webmanifest","/icon-192.png","/icon-512.png"];
 
 self.addEventListener("install",e=>{

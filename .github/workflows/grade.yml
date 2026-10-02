@@ -9,3 +9,7 @@ jobs:
     steps:
       - name: Run the Edge Board grader
         run: curl -fsS --max-time 90 "https://nfl-edge-kappa.vercel.app/api/cron/grade?key=${{ secrets.CRON_KEY }}" | head -c 600
+      - name: Refresh the TD board (logs + grades TD plays) and the Power Poll
+        run: |
+          curl -sS --max-time 90 "https://nfl-edge-kappa.vercel.app/api/td" -o /dev/null -w "td %{http_code}\n" || true
+          curl -sS --max-time 90 "https://nfl-edge-kappa.vercel.app/api/power" -o /dev/null -w "power %{http_code}\n" || true

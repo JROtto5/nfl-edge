@@ -143,7 +143,21 @@ nav button.on{background:var(--ink);color:#07090f}
   <div class="foot">Every 2026 game run through today's exact rules, using only what was known before kickoff, graded at the closing line and price. Stakes as shown ($10, $5 on NFL model plays). Some rules were tuned on this season's data, so expect the real rate to settle nearer 57–60%. · <a href="/board">full analysis board</a></div>
 </section>
 
-<nav><button data-v="board" class="on">Today</button><button data-v="hist">History</button><button data-v="poll" onclick="location.href='/power'">Poll</button></nav>
+<section id="vTD" hidden>
+  <div class="stats">
+    <div class="stat"><div class="v" id="tPL">—</div><div class="l">TD plays $</div></div>
+    <div class="stat"><div class="v" id="tRec">—</div><div class="l">record</div></div>
+    <div class="stat"><div class="v" id="tN">—</div><div class="l">plays now</div></div>
+  </div>
+  <div class="sect">Anytime TD plays · model beats FanDuel</div>
+  <div id="tdPlays"></div>
+  <details class="fold"><summary>Every game · who scores <span class="n" id="tdNG">0</span></summary><div class="list" id="tdGames"></div></details>
+  <div class="hcard" style="margin-top:14px"><div class="hl">TD play history · graded at the FanDuel price we logged</div><div id="tdHist"></div></div>
+  <div class="hcard"><div class="hl">Backtest · every 2026 game, only info known before kickoff</div><div id="tdBT"></div></div>
+  <div class="foot" id="tdFoot"></div>
+</section>
+
+<nav><button data-v="board" class="on">Today</button><button data-v="hist">History</button><button data-v="td">TDs</button><button data-v="poll" onclick="location.href='/power'">Poll</button></nav>
 
 <script src="/verdict.js"></script>
 <script>
@@ -264,10 +278,42 @@ async function loadHistory(){
   $("bysig").innerHTML=types.map(([l,rs])=>{ const x=pl(rs); return `<div class="hrow"><div class="dot ${x>=0?"w":"l"}">${x>=0?"▲":"▼"}</div><div class="t">${l}<small>${rt(rs)} · ${Math.round(100*rs.filter(W).length/Math.max(1,rs.filter(r=>W(r)||L(r)).length))}% hit</small></div><div class="m ${x>=0?"pos":"neg"}">${money(x)}</div></div>`; }).join("");
   $("recent").innerHTML=P.slice().reverse().slice(0,40).map(r=>`<div class="hrow"><div class="dot ${W(r)?"w":L(r)?"l":"p"}">${W(r)?"W":L(r)?"L":"P"}</div><div class="t">${r.pick}<small>${r.away} ${r.as}–${r.hs} ${r.home} · ${new Date(r.date).toLocaleDateString([], {month:"short",day:"numeric"})} · ${r.conf}%${r.lg==="nfl"?" · NFL":""}</small></div><div class="m ${W(r)?"pos":L(r)?"neg":"dim"}">${W(r)?"+$"+win(r).toFixed(0):L(r)?"−$"+r.amt:"$0"}</div></div>`).join("")||'<div class="dim">No graded plays yet.</div>';
 }
-document.querySelectorAll("nav button[data-v=board],nav button[data-v=hist]").forEach(b=>b.onclick=()=>{ document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b)); const h=b.dataset.v==="hist";
-  $("vBoard").hidden=h; $("vHist").hidden=!h; $("sub").textContent=h?"season results":"today's plays"; window.scrollTo({top:0,behavior:"smooth"}); if(h) loadHistory(); });
+document.querySelectorAll("nav button[data-v=board],nav button[data-v=hist],nav button[data-v=td]").forEach(b=>b.onclick=()=>{ document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b)); const v=b.dataset.v;
+  $("vBoard").hidden=v!=="board"; $("vHist").hidden=v!=="hist"; $("vTD").hidden=v!=="td"; $("sub").textContent={board:"today's plays",hist:"season results",td:"touchdown scorers"}[v]; window.scrollTo({top:0,behavior:"smooth"}); if(v==="hist") loadHistory(); if(v==="td") loadTD(); });
+
+/* ---- TDs tab ---- */
+let TD=null;
+const amer=a=>a==null?"—":(a>0?"+"+a:String(a));
+const kick=d=>new Date(d).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"});
+function tdWhy(p,g,t){ return `<div class="kv"><div>Model chance</div><div>${p.p}%</div><div>FanDuel ${amer(p.price)} implies</div><div>${p.imp??"—"}%</div><div>Edge</div><div class="${(p.edge||0)>0?"pos":"neg"}">${p.edge!=null?(p.edge>0?"+":"")+p.edge+" pts":"—"}</div><div>Share of team carries</div><div>${p.raS}%</div><div>Share of team targets</div><div>${p.tgS}%</div><div>${esc2(t.team)} implied points</div><div>${t.implied}</div></div>`; }
+const esc2=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function renderTD(){
+  if(!TD) return; const H=TD.history||[], G=H.filter(r=>r.result!=="void"), w=G.filter(r=>r.result==="win").length, l=G.length-w, pl=H.reduce((a,r)=>a+(r.won||0),0);
+  $("tPL").innerHTML=`<span class="${pl>=0?"pos":"neg"}">${money(pl)}</span>`; $("tRec").textContent=`${w}–${l}`; $("tN").textContent=TD.plays.length;
+  const gm=id=>TD.games.find(g=>g.id===id);
+  $("tdPlays").innerHTML=TD.plays.length?TD.plays.map((p,i)=>{ const g=gm(p.gid), t=g.teams.find(t=>t.team===p.team), opp=p.team===g.home?g.away:g.home;
+    return `<div class="card" style="--i:${i}" onclick="this.classList.toggle('open')"><div class="top"><div class="logos"><img src="${p.team===g.home?g.homeLogo:g.awayLogo}" alt=""></div>
+      <div class="body"><div class="pick">${esc2(p.n)}</div><div class="sub">Anytime TD · ${esc2(p.team)} ${p.team===g.home?"vs":"@"} ${esc2(opp)} · ${kick(g.date)}${g.lg==="nfl"?" · NFL":""}</div><div class="bar"><i style="--w:${p.p}%"></i></div></div>
+      <div class="right"><div class="c">${amer(p.price)}</div><div class="s">${p.p}% vs ${p.imp}%</div><div class="stake">$${TD.rule.stake}</div></div></div>
+      <div class="an"><div><div class="in"><h4>Why</h4><p>The model gives ${esc2(p.n)} a ${p.p}% chance to score. FanDuel's ${amer(p.price)} only needs ${p.imp}%, so the price is ${p.edge} points too long.</p>${tdWhy(p,g,t)}<h4>Check before betting</h4><p>The model reads the injury report but not depth-chart news. If he's been ruled out or benched, skip it.</p></div></div></div></div>`; }).join("")
+    :`<div class="empty"><b>No TD plays right now</b>Nothing on FanDuel's board is priced long enough. New games are checked every 20 minutes.</div>`;
+  $("tdNG").textContent=TD.games.length;
+  $("tdGames").innerHTML=TD.games.map(g=>`<div class="mini" onclick="this.classList.toggle('open')"><div class="top"><div class="logos"><img src="${g.awayLogo}" alt=""><img src="${g.homeLogo}" alt=""></div><div class="t">${esc2(g.away)} @ ${esc2(g.home)}<small>${kick(g.date)}${g.lg==="nfl"?" · NFL":""}${g.priced?"":" · no FanDuel prices yet"}</small></div><div class="r">${esc2(g.teams[0].players[0]?g.teams[0].players[0].n.split(" ").slice(-1)[0]:"")}<small>top: ${g.teams.map(t=>t.players[0]?t.players[0].p+"%":"—").join(" / ")}</small></div></div>
+    <div class="an"><div><div class="in">${g.teams.map(t=>`<h4>${esc2(t.team)} · ${t.implied} implied pts${t.games<2?" · thin history":""}</h4><div class="kv">${t.players.slice(0,6).map(p=>`<div>${esc2(p.n)}${p.edge!=null&&p.edge>=5&&p.p>=25?" ★":""}</div><div>${p.p}% <span class="dim">· ${amer(p.price)}</span></div>`).join("")}</div>`).join("")}</div></div></div></div>`).join("");
+  $("tdHist").innerHTML=H.length?`<div class="split" style="margin-bottom:8px"><div><div class="v ${pl>=0?"pos":"neg"}">${money(pl)}</div><div class="s">${w}–${l}${H.length-G.length?` · ${H.length-G.length} void`:""} · $${TD.rule.stake} a play</div></div><div><div class="v">${G.length?Math.round(100*w/G.length):0}%</div><div class="s">hit · avg price ${amer(Math.round(G.reduce((a,r)=>a+r.price,0)/Math.max(1,G.length)))}</div></div></div>`
+      +H.slice(0,30).map(r=>`<div class="hrow"><div class="dot ${r.result==="win"?"w":r.result==="loss"?"l":"p"}">${r.result==="win"?"W":r.result==="loss"?"L":"V"}</div><div class="t">${esc2(r.n)} ${amer(r.price)}<small>${esc2(r.away)} @ ${esc2(r.home)} · ${new Date(r.date).toLocaleDateString([], {month:"short",day:"numeric"})} · model ${r.p}%${r.lg==="nfl"?" · NFL":""}</small></div><div class="m ${r.won>0?"pos":r.won<0?"neg":"dim"}">${r.won>0?"+$"+r.won.toFixed(0):r.won<0?"−$"+(-r.won):"$0"}</div></div>`).join("")
+    :`<div class="dim" style="font-weight:600">The first TD plays were logged this week. Each one is frozen at the FanDuel price when it was picked, then graded from the final box score. A player who doesn't play is void, the way FanDuel handles it.</div>`;
+  const bt=TD.backtest||{};
+  $("tdBT").innerHTML=["cfb","nfl"].filter(lg=>bt[lg]).map(lg=>{ const b=bt[lg], pct=x=>Math.round(100*x.hit/Math.max(1,x.n));
+    return `<h4 style="margin:6px 0 8px;font:800 12px var(--display);letter-spacing:.1em;color:var(--dim)">${lg==="cfb"?"COLLEGE":"NFL"} · ${b.players.toLocaleString()} player-games</h4>
+    <div class="split" style="margin-bottom:10px"><div><div class="v">${pct(b.top)}%</div><div class="s">model's #1 pick per team scored (${b.top.hit}/${b.top.n}). Model said ${b.top.pred}%.</div></div><div><div class="v">${pct(b.over50)}%</div><div class="s">players rated 50%+ scored (${b.over50.hit}/${b.over50.n})</div></div></div>
+    <div class="kv">${b.bins.filter(x=>x.n).map(x=>`<div>Model said ${Math.round(x.lo*100)}–${Math.round(x.hi*100)}% <span class="dim">(${x.n})</span></div><div>${x.hit}% scored</div>`).join("")}</div>`; }).join('<div style="height:14px"></div>')
+    +`<p class="dim" style="font-size:12.5px;margin:12px 0 0">When the model's number matches the "% scored" column, the model is honest. FanDuel didn't publish past prices, so the backtest proves the model's accuracy, not profit. Profit is tracked in the play history above.</p>`;
+  $("tdFoot").innerHTML=`A play needs a model chance of ${TD.rule.minP*100}%+ and must beat FanDuel's implied odds by ${TD.rule.minEdge*100}+ points, max ${TD.rule.perGame} a game. FanDuel feed: NFL ${TD.fanduel.nfl}, college ${TD.fanduel.cfb}. Updated ${new Date(TD.generatedAt).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}.`;
+}
+async function loadTD(){ try{ TD=await (await fetch("/api/td",{cache:"no-store"})).json(); renderTD(); }catch(e){ $("tdPlays").innerHTML='<div class="empty"><b>Reconnecting…</b></div>'; } }
 async function loadUp(){ try{ UP=await (await fetch("/api/upcoming",{cache:"no-store"})).json(); renderBoard(); }catch(e){ $("upd").textContent="reconnecting"; } }
-loadUp(); strip(); if(location.hash==="#hist") document.querySelector("nav button[data-v=hist]").click(); setInterval(()=>{ loadUp(); REC=null; strip(); },3*60e3);
+loadUp(); strip(); if(location.hash==="#hist"||location.hash==="#td") document.querySelector(`nav button[data-v=${location.hash.slice(1)}]`).click(); setInterval(()=>{ loadUp(); REC=null; strip(); },3*60e3);
 setInterval(()=>{ const h=document.querySelector(".hero .tag"); if(h&&UP) renderBoard(); },60e3);
 if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
 </script></body></html>
