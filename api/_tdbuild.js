@@ -65,8 +65,9 @@ async function buildTD(){
     const teams=[g.away,g.home].map(team=>{ const hist=T.teamHistory(boxes,team,new Date(g.date));
       const pl=T.teamLambdas(hist,T.implied(g,team),k[g.lg],g.lg,g.outSet[team]||new Set()).slice(0,8).map(x=>{
         const a=prices[g.id]?prices[g.id][norm(x.n)]:undefined; const imp=a!=null?1/dec(a):null;
-        return {id:x.id,n:x.n,p:Math.round(x.p*1000)/10,price:a??null,imp:imp!=null?Math.round(imp*1000)/10:null,edge:imp!=null?Math.round((x.p-imp)*1000)/10:null,raS:Math.round(x.raS*100),tgS:Math.round(x.tgS*100)}; });
-      return {team,implied:Math.round(T.implied(g,team)*10)/10,games:hist.length,players:pl}; });
+        const ev=a!=null?x.p*dec(a)-1:null;
+        return {id:x.id,n:x.n,p:Math.round(x.p*1000)/10,lam:Math.round(x.lam*1000)/1000,raw:Math.round(x.raw*1000)/10,ev:ev!=null?Math.round(ev*1000)/1000:null,price:a??null,imp:imp!=null?Math.round(imp*1000)/10:null,edge:imp!=null?Math.round((x.p-imp)*1000)/10:null,raS:Math.round(x.raS*100),tgS:Math.round(x.tgS*100)}; });
+      return {team,implied:Math.round(T.implied(g,team)*10)/10,xtd:Math.round(T.implied(g,team)*k[g.lg]*100)/100,games:hist.length,players:pl}; });
     // plays: model beats FanDuel's price by the margin, best edges first, max 3 a game
     const cand=teams.flatMap(t=>t.players.map(p=>({...p,team:t.team}))).filter(p=>p.price!=null&&p.p>=RULE.minP*100&&p.edge>=RULE.minEdge*100).sort((a,b)=>b.edge-a.edge).slice(0,RULE.perGame);
     cand.forEach(p=>{ const key=g.id+"|"+p.id; const rec=L.plays[key];

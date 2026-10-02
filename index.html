@@ -110,6 +110,12 @@ nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(sa
   background:rgba(18,23,35,.72);border:1px solid var(--edge2);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);box-shadow:0 18px 40px -12px #000c}
 nav button{border:0;background:none;color:var(--dim);font:800 14px var(--display);padding:12px 24px;border-radius:99px;transition:.25s}
 nav button.on{background:var(--ink);color:#07090f}
+.seg{display:flex;gap:4px;padding:4px;border-radius:16px;background:var(--glass);border:1px solid var(--edge);margin-bottom:14px}
+.seg button{flex:1;border:0;background:none;color:var(--dim);font:800 14px var(--display);padding:11px 8px;border-radius:12px;cursor:pointer}
+.seg button.on{background:var(--ink);color:#07090f}.seg em{font-style:normal;font-family:var(--mono);opacity:.6;margin-left:4px}
+.steps{counter-reset:st;margin:6px 0 0;padding:0;list-style:none}.steps li{counter-increment:st;position:relative;padding:8px 0 8px 34px;border-bottom:1px solid var(--edge)}.steps li:last-child{border:0}
+.steps li::before{content:counter(st);position:absolute;left:0;top:8px;width:22px;height:22px;border-radius:7px;background:#ffffff14;display:grid;place-items:center;font:800 11px var(--mono)}
+.steps b{font-family:var(--mono)}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.card{opacity:1;transform:none}}
 </style></head><body>
@@ -144,14 +150,17 @@ nav button.on{background:var(--ink);color:#07090f}
 </section>
 
 <section id="vTD" hidden>
+  <div class="seg" id="tdSeg"><button data-lg="nfl" class="on">NFL <em id="tdCnfl"></em></button><button data-lg="cfb">College <em id="tdCcfb"></em></button></div>
   <div class="stats">
     <div class="stat"><div class="v" id="tPL">—</div><div class="l">TD plays $</div></div>
     <div class="stat"><div class="v" id="tRec">—</div><div class="l">record</div></div>
     <div class="stat"><div class="v" id="tN">—</div><div class="l">plays now</div></div>
   </div>
-  <div class="sect">Anytime TD plays · model beats FanDuel</div>
+  <div id="tdBest"></div>
+  <div class="sect" id="tdSect">Anytime TD plays</div>
   <div id="tdPlays"></div>
   <details class="fold"><summary>Every game · who scores <span class="n" id="tdNG">0</span></summary><div class="list" id="tdGames"></div></details>
+  <details class="fold"><summary>How the TD model works</summary><div class="in" style="padding:0 18px 16px;font-size:14px;color:#c6cfdd;line-height:1.55" id="tdHow"></div></details>
   <div class="hcard" style="margin-top:14px"><div class="hl">TD play history · graded at the FanDuel price we logged</div><div id="tdHist"></div></div>
   <div class="hcard"><div class="hl">Backtest · every 2026 game, only info known before kickoff</div><div id="tdBT"></div></div>
   <div class="foot" id="tdFoot"></div>
@@ -282,35 +291,63 @@ document.querySelectorAll("nav button[data-v=board],nav button[data-v=hist],nav 
   $("vBoard").hidden=v!=="board"; $("vHist").hidden=v!=="hist"; $("vTD").hidden=v!=="td"; $("sub").textContent={board:"today's plays",hist:"season results",td:"touchdown scorers"}[v]; window.scrollTo({top:0,behavior:"smooth"}); if(v==="hist") loadHistory(); if(v==="td") loadTD(); });
 
 /* ---- TDs tab ---- */
-let TD=null;
+let TD=null, TDLG=(()=>{ try{ return localStorage.getItem("edge-td-lg")||"nfl"; }catch(e){ return "nfl"; } })();
 const amer=a=>a==null?"—":(a>0?"+"+a:String(a));
 const kick=d=>new Date(d).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"});
-function tdWhy(p,g,t){ return `<div class="kv"><div>Model chance</div><div>${p.p}%</div><div>FanDuel ${amer(p.price)} implies</div><div>${p.imp??"—"}%</div><div>Edge</div><div class="${(p.edge||0)>0?"pos":"neg"}">${p.edge!=null?(p.edge>0?"+":"")+p.edge+" pts":"—"}</div><div>Share of team carries</div><div>${p.raS}%</div><div>Share of team targets</div><div>${p.tgS}%</div><div>${esc2(t.team)} implied points</div><div>${t.implied}</div></div>`; }
 const esc2=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const dec2=a=>a>0?1+a/100:1+100/Math.abs(a);
+/* the step-by-step math for one player, with his real numbers */
+function tdSteps(p,g,t){ const share=t.xtd?p.lam/t.xtd:0, opp=p.team===g.home?g.away:g.home;
+  return `<ol class="steps">
+  <li><b>${t.implied}</b> points: what the betting line expects ${esc2(t.team)} to score vs ${esc2(opp)} (total ${g.total}, spread ${g.spread>0?"+":""}${g.spread} for ${esc2(g.home)}).</li>
+  <li>× <b>${TD.k[g.lg].toFixed(3)}</b> offensive TDs per point (measured from every 2026 ${g.lg==="nfl"?"NFL":"college"} game) = <b>${t.xtd.toFixed(2)}</b> expected ${esc2(t.team)} TDs.</li>
+  <li>× <b>${Math.round(share*100)}%</b>: ${esc2(p.n)}'s share of them. He gets ${p.raS}% of the team's carries and ${p.tgS}% of its targets (recent games count more), nudged by the TDs he's actually scored. = <b>${p.lam.toFixed(2)}</b> expected TDs for him.</li>
+  <li>Chance of at least one: 1 − e<sup>−${p.lam.toFixed(2)}</sup> = <b>${p.raw}%</b>, then calibrated against how 5,000+ past predictions actually landed = <b>${p.p}%</b>.</li>
+  ${p.price!=null?`<li>FanDuel <b>${amer(p.price)}</b> breaks even at <b>${p.imp}%</b>. Model ${p.p}% − ${p.imp}% = <b>${p.edge>0?"+":""}${p.edge} pts</b> of edge. Expected profit: <b>${p.ev>=0?"+":"−"}$${Math.abs(p.ev*TD.rule.stake).toFixed(2)}</b> per $${TD.rule.stake}.</li>`:""}
+  </ol>`; }
 function renderTD(){
-  if(!TD) return; const H=TD.history||[], G=H.filter(r=>r.result!=="void"), w=G.filter(r=>r.result==="win").length, l=G.length-w, pl=H.reduce((a,r)=>a+(r.won||0),0);
-  $("tPL").innerHTML=`<span class="${pl>=0?"pos":"neg"}">${money(pl)}</span>`; $("tRec").textContent=`${w}–${l}`; $("tN").textContent=TD.plays.length;
-  const gm=id=>TD.games.find(g=>g.id===id);
-  $("tdPlays").innerHTML=TD.plays.length?TD.plays.map((p,i)=>{ const g=gm(p.gid), t=g.teams.find(t=>t.team===p.team), opp=p.team===g.home?g.away:g.home;
-    return `<div class="card" style="--i:${i}" onclick="this.classList.toggle('open')"><div class="top"><div class="logos"><img src="${p.team===g.home?g.homeLogo:g.awayLogo}" alt=""></div>
-      <div class="body"><div class="pick">${esc2(p.n)}</div><div class="sub">Anytime TD · ${esc2(p.team)} ${p.team===g.home?"vs":"@"} ${esc2(opp)} · ${kick(g.date)}${g.lg==="nfl"?" · NFL":""}</div><div class="bar"><i style="--w:${p.p}%"></i></div></div>
-      <div class="right"><div class="c">${amer(p.price)}</div><div class="s">${p.p}% vs ${p.imp}%</div><div class="stake">$${TD.rule.stake}</div></div></div>
-      <div class="an"><div><div class="in"><h4>Why</h4><p>The model gives ${esc2(p.n)} a ${p.p}% chance to score. FanDuel's ${amer(p.price)} only needs ${p.imp}%, so the price is ${p.edge} points too long.</p>${tdWhy(p,g,t)}<h4>Check before betting</h4><p>The model reads the injury report but not depth-chart news. If he's been ruled out or benched, skip it.</p></div></div></div></div>`; }).join("")
-    :`<div class="empty"><b>No TD plays right now</b>Nothing on FanDuel's board is priced long enough. New games are checked every 20 minutes.</div>`;
-  $("tdNG").textContent=TD.games.length;
-  $("tdGames").innerHTML=TD.games.map(g=>`<div class="mini" onclick="this.classList.toggle('open')"><div class="top"><div class="logos"><img src="${g.awayLogo}" alt=""><img src="${g.homeLogo}" alt=""></div><div class="t">${esc2(g.away)} @ ${esc2(g.home)}<small>${kick(g.date)}${g.lg==="nfl"?" · NFL":""}${g.priced?"":" · no FanDuel prices yet"}</small></div><div class="r">${esc2(g.teams[0].players[0]?g.teams[0].players[0].n.split(" ").slice(-1)[0]:"")}<small>top: ${g.teams.map(t=>t.players[0]?t.players[0].p+"%":"—").join(" / ")}</small></div></div>
-    <div class="an"><div><div class="in">${g.teams.map(t=>`<h4>${esc2(t.team)} · ${t.implied} implied pts${t.games<2?" · thin history":""}</h4><div class="kv">${t.players.slice(0,6).map(p=>`<div>${esc2(p.n)}${p.edge!=null&&p.edge>=5&&p.p>=25?" ★":""}</div><div>${p.p}% <span class="dim">· ${amer(p.price)}</span></div>`).join("")}</div>`).join("")}</div></div></div></div>`).join("");
+  if(!TD) return; const lg=TDLG;
+  document.querySelectorAll("#tdSeg button").forEach(b=>b.classList.toggle("on",b.dataset.lg===lg));
+  ["nfl","cfb"].forEach(l=>{ $("tdC"+l).textContent=TD.plays.filter(p=>p.lg===l).length||""; });
+  const gm=id=>TD.games.find(g=>g.id===id), plays=TD.plays.filter(p=>p.lg===lg).sort((a,b)=>(b.ev??0)-(a.ev??0)), games=TD.games.filter(g=>g.lg===lg);
+  const H=(TD.history||[]).filter(r=>r.lg===lg), G=H.filter(r=>r.result!=="void"), w=G.filter(r=>r.result==="win").length, l=G.length-w, pl=H.reduce((a,r)=>a+(r.won||0),0);
+  $("tPL").innerHTML=`<span class="${pl>=0?"pos":"neg"}">${money(pl)}</span>`; $("tRec").textContent=`${w}–${l}`; $("tN").textContent=plays.length;
+  // best play = highest expected profit per dollar
+  const b=plays[0];
+  if(b){ const g=gm(b.gid), t=g.teams.find(t=>t.team===b.team), opp=b.team===g.home?g.away:g.home;
+    $("tdBest").innerHTML=`<div class="hero" style="--c1:#b04dff;--c2:#34f5a0;cursor:default"><div class="tag">★ Best ${lg==="nfl"?"NFL":"college"} TD play</div>
+      <div class="row"><div><div class="pick" style="font-size:clamp(26px,7.4vw,38px)">${esc2(b.n)}</div><div class="match" style="margin-top:8px"><img src="${b.team===g.home?g.homeLogo:g.awayLogo}" alt="">${esc2(b.team)} ${b.team===g.home?"vs":"@"} ${esc2(opp)} · ${kick(g.date)}</div></div>
+      <div style="text-align:right;flex:none"><div style="font:800 30px var(--mono)">${amer(b.price)}</div><div class="dim" style="font:700 12px var(--display)">FanDuel · $${TD.rule.stake}</div></div></div>
+      <div class="meta"><span class="chip">Model <b>${b.p}%</b></span><span class="chip">Needs <b>${b.imp}%</b></span><span class="chip">Edge <b>+${b.edge}</b></span><span class="chip">EV <b>+$${(b.ev*TD.rule.stake).toFixed(2)}</b></span></div>
+      <details style="margin-top:14px"><summary style="cursor:pointer;font:800 13px var(--display);color:#ffffffcc">How this number was calculated ▾</summary>${tdSteps(b,g,t)}</details></div>`;
+  } else $("tdBest").innerHTML="";
+  $("tdSect").textContent=plays.length>1?`More ${lg==="nfl"?"NFL":"college"} TD plays · best first`:plays.length?"":"Anytime TD plays";
+  $("tdPlays").innerHTML=plays.length?plays.slice(1).map((p,i)=>{ const g=gm(p.gid), t=g.teams.find(t=>t.team===p.team), opp=p.team===g.home?g.away:g.home;
+    return `<div class="card" style="--i:${i}" onclick="if(!event.target.closest('.an'))this.classList.toggle('open')"><div class="top"><div class="logos"><img src="${p.team===g.home?g.homeLogo:g.awayLogo}" alt=""></div>
+      <div class="body"><div class="pick">${esc2(p.n)}</div><div class="sub">${esc2(p.team)} ${p.team===g.home?"vs":"@"} ${esc2(opp)} · ${kick(g.date)}</div><div class="bar"><i style="--w:${p.p}%"></i></div></div>
+      <div class="right"><div class="c">${amer(p.price)}</div><div class="s">${p.p}% vs ${p.imp}%</div><div class="stake">EV +$${(p.ev*TD.rule.stake).toFixed(2)}</div></div></div>
+      <div class="an"><div><div class="in"><h4>How it's calculated</h4>${tdSteps(p,g,t)}<h4>Check before betting</h4><p>The model reads the injury report but not depth-chart news. If he's been ruled out or benched, skip it.</p></div></div></div></div>`; }).join("")
+    :`<div class="empty"><b>No ${lg==="nfl"?"NFL":"college"} TD plays right now</b>Nothing on FanDuel's board is priced long enough. Checked every 20 minutes.</div>`;
+  $("tdNG").textContent=games.length;
+  $("tdGames").innerHTML=games.map(g=>`<div class="mini" onclick="this.classList.toggle('open')"><div class="top"><div class="logos"><img src="${g.awayLogo}" alt=""><img src="${g.homeLogo}" alt=""></div><div class="t">${esc2(g.away)} @ ${esc2(g.home)}<small>${kick(g.date)}${g.priced?"":" · no FanDuel prices yet"}</small></div><div class="r">${g.teams.map(t=>t.players[0]?esc2(t.players[0].n.split(" ").slice(-1)[0]):"—").join(" · ")}<small>top: ${g.teams.map(t=>t.players[0]?t.players[0].p+"%":"—").join(" / ")}</small></div></div>
+    <div class="an"><div><div class="in">${g.teams.map(t=>`<h4>${esc2(t.team)} · ${t.implied} pts → ${t.xtd} TDs expected${t.games<2?" · thin history":""}</h4><div class="kv">${t.players.slice(0,6).map(p=>`<div>${esc2(p.n)}${p.edge!=null&&p.edge>=5&&p.p>=25?" ★":""}</div><div>${p.p}% <span class="dim">· ${amer(p.price)}</span></div>`).join("")}</div>`).join("")}</div></div></div></div>`).join("");
+  $("tdHow").innerHTML=`<p><b>The idea:</b> a player scores when his team scores and he's the one with the ball. So the model multiplies two things the data tells us well.</p>
+    <p><b>1 · How many TDs his team should score.</b> The betting line gives each team's expected points (from the total and the spread). Every 2026 game says how many offensive TDs a point is worth: ${TD.k.nfl.toFixed(3)} in the NFL, ${TD.k.cfb.toFixed(3)} in college. A team expected to score 24 gets about ${(24*TD.k[lg]).toFixed(1)} TDs.</p>
+    <p><b>2 · How much of that is his.</b> His share of the team's carries and targets over the last 6 games (recent games count more). Actual TDs scored count a little, but touches count much more, because a few lucky TDs don't make a goal-line back. Rushing and receiving are split by how this team actually scores.</p>
+    <p><b>3 · Turn it into a chance.</b> Expected TDs → chance of at least one: 1 − e<sup>−x</sup>. Then it's calibrated against how 5,000+ past predictions landed, so a "30%" really means about 30%.</p>
+    <p><b>4 · Injuries.</b> Players listed Out, Doubtful or IR are removed and their touches go to everyone else. Missing the team's last game is a small penalty.</p>
+    <p><b>5 · The play.</b> Compare to FanDuel's price. A play needs a ${TD.rule.minP*100}%+ chance that beats FanDuel's break-even by ${TD.rule.minEdge*100}+ points, max ${TD.rule.perGame} per game. <b>Best</b> = most expected profit per dollar. $${TD.rule.stake} a play, because even good TD bets lose more often than they win.</p>`;
   $("tdHist").innerHTML=H.length?`<div class="split" style="margin-bottom:8px"><div><div class="v ${pl>=0?"pos":"neg"}">${money(pl)}</div><div class="s">${w}–${l}${H.length-G.length?` · ${H.length-G.length} void`:""} · $${TD.rule.stake} a play</div></div><div><div class="v">${G.length?Math.round(100*w/G.length):0}%</div><div class="s">hit · avg price ${amer(Math.round(G.reduce((a,r)=>a+r.price,0)/Math.max(1,G.length)))}</div></div></div>`
-      +H.slice(0,30).map(r=>`<div class="hrow"><div class="dot ${r.result==="win"?"w":r.result==="loss"?"l":"p"}">${r.result==="win"?"W":r.result==="loss"?"L":"V"}</div><div class="t">${esc2(r.n)} ${amer(r.price)}<small>${esc2(r.away)} @ ${esc2(r.home)} · ${new Date(r.date).toLocaleDateString([], {month:"short",day:"numeric"})} · model ${r.p}%${r.lg==="nfl"?" · NFL":""}</small></div><div class="m ${r.won>0?"pos":r.won<0?"neg":"dim"}">${r.won>0?"+$"+r.won.toFixed(0):r.won<0?"−$"+(-r.won):"$0"}</div></div>`).join("")
-    :`<div class="dim" style="font-weight:600">The first TD plays were logged this week. Each one is frozen at the FanDuel price when it was picked, then graded from the final box score. A player who doesn't play is void, the way FanDuel handles it.</div>`;
-  const bt=TD.backtest||{};
-  $("tdBT").innerHTML=["cfb","nfl"].filter(lg=>bt[lg]).map(lg=>{ const b=bt[lg], pct=x=>Math.round(100*x.hit/Math.max(1,x.n));
-    return `<h4 style="margin:6px 0 8px;font:800 12px var(--display);letter-spacing:.1em;color:var(--dim)">${lg==="cfb"?"COLLEGE":"NFL"} · ${b.players.toLocaleString()} player-games</h4>
-    <div class="split" style="margin-bottom:10px"><div><div class="v">${pct(b.top)}%</div><div class="s">model's #1 pick per team scored (${b.top.hit}/${b.top.n}). Model said ${b.top.pred}%.</div></div><div><div class="v">${pct(b.over50)}%</div><div class="s">players rated 50%+ scored (${b.over50.hit}/${b.over50.n})</div></div></div>
-    <div class="kv">${b.bins.filter(x=>x.n).map(x=>`<div>Model said ${Math.round(x.lo*100)}–${Math.round(x.hi*100)}% <span class="dim">(${x.n})</span></div><div>${x.hit}% scored</div>`).join("")}</div>`; }).join('<div style="height:14px"></div>')
-    +`<p class="dim" style="font-size:12.5px;margin:12px 0 0">When the model's number matches the "% scored" column, the model is honest. FanDuel didn't publish past prices, so the backtest proves the model's accuracy, not profit. Profit is tracked in the play history above.</p>`;
-  $("tdFoot").innerHTML=`A play needs a model chance of ${TD.rule.minP*100}%+ and must beat FanDuel's implied odds by ${TD.rule.minEdge*100}+ points, max ${TD.rule.perGame} a game. FanDuel feed: NFL ${TD.fanduel.nfl}, college ${TD.fanduel.cfb}. Updated ${new Date(TD.generatedAt).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}.`;
+      +H.slice(0,30).map(r=>`<div class="hrow"><div class="dot ${r.result==="win"?"w":r.result==="loss"?"l":"p"}">${r.result==="win"?"W":r.result==="loss"?"L":"V"}</div><div class="t">${esc2(r.n)} ${amer(r.price)}<small>${esc2(r.away)} @ ${esc2(r.home)} · ${new Date(r.date).toLocaleDateString([], {month:"short",day:"numeric"})} · model ${r.p}%</small></div><div class="m ${r.won>0?"pos":r.won<0?"neg":"dim"}">${r.won>0?"+$"+r.won.toFixed(0):r.won<0?"−$"+(-r.won):"$0"}</div></div>`).join("")
+    :`<div class="dim" style="font-weight:600">No ${lg==="nfl"?"NFL":"college"} TD plays graded yet. The first ones were logged this week. Each is frozen at the FanDuel price when picked and graded from the final box score. A player who doesn't play is void, the way FanDuel handles it.</div>`;
+  const bt=(TD.backtest||{})[lg];
+  $("tdBT").innerHTML=bt?(()=>{ const pct=x=>Math.round(100*x.hit/Math.max(1,x.n));
+    return `<div class="split" style="margin-bottom:10px"><div><div class="v">${pct(bt.top)}%</div><div class="s">model's #1 pick per team scored (${bt.top.hit}/${bt.top.n}). Model said ${bt.top.pred}%.</div></div><div><div class="v">${pct(bt.over50)}%</div><div class="s">players rated 50%+ scored (${bt.over50.hit}/${bt.over50.n})</div></div></div>
+    <div class="kv">${bt.bins.filter(x=>x.n).map(x=>`<div>Model said ${Math.round(x.lo*100)}–${Math.round(x.hi*100)}% <span class="dim">(${x.n})</span></div><div>${x.hit}% scored</div>`).join("")}</div>
+    <p class="dim" style="font-size:12.5px;margin:12px 0 0">${bt.players.toLocaleString()} player-games. When "% scored" matches what the model said, the model is honest.${lg==="nfl"?" NFL is only a few weeks in, so these numbers are still noisy.":""} FanDuel doesn't publish past prices, so this proves accuracy, not profit. Profit is tracked in the history above.</p>`; })():"";
+  $("tdFoot").innerHTML=`FanDuel feed: ${TD.fanduel[lg]} · updated ${new Date(TD.generatedAt).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`;
 }
+document.querySelectorAll("#tdSeg button").forEach(b=>b.onclick=()=>{ TDLG=b.dataset.lg; try{ localStorage.setItem("edge-td-lg",TDLG); }catch(e){} renderTD(); });
 async function loadTD(){ try{ TD=await (await fetch("/api/td",{cache:"no-store"})).json(); renderTD(); }catch(e){ $("tdPlays").innerHTML='<div class="empty"><b>Reconnecting…</b></div>'; } }
 async function loadUp(){ try{ UP=await (await fetch("/api/upcoming",{cache:"no-store"})).json(); renderBoard(); }catch(e){ $("upd").textContent="reconnecting"; } }
 loadUp(); strip(); if(location.hash==="#hist"||location.hash==="#td") document.querySelector(`nav button[data-v=${location.hash.slice(1)}]`).click(); setInterval(()=>{ loadUp(); REC=null; strip(); },3*60e3);
