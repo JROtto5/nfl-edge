@@ -116,6 +116,8 @@ nav button.on{background:var(--ink);color:#07090f}
 .steps{counter-reset:st;margin:6px 0 0;padding:0;list-style:none}.steps li{counter-increment:st;position:relative;padding:8px 0 8px 34px;border-bottom:1px solid var(--edge)}.steps li:last-child{border:0}
 .steps li::before{content:counter(st);position:absolute;left:0;top:8px;width:22px;height:22px;border-radius:7px;background:#ffffff14;display:grid;place-items:center;font:800 11px var(--mono)}
 .steps b{font-family:var(--mono)}
+.why{margin:6px 0 0;padding-left:18px}.why li{margin:0 0 7px}
+.math summary{cursor:pointer;font:800 12.5px var(--display);color:var(--dim);margin-top:6px}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.card{opacity:1;transform:none}}
 </style></head><body>
@@ -296,6 +298,7 @@ const amer=a=>a==null?"—":(a>0?"+"+a:String(a));
 const kick=d=>new Date(d).toLocaleString([], {weekday:"short",hour:"numeric",minute:"2-digit"});
 const esc2=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const dec2=a=>a>0?1+a/100:1+100/Math.abs(a);
+const whyList=p=>`<ul class="why">${(p.why||[]).map(x=>`<li>${esc2(x)}</li>`).join("")}</ul>`;
 /* the step-by-step math for one player, with his real numbers */
 function tdSteps(p,g,t){ const share=t.xtd?p.lam/t.xtd:0, opp=p.team===g.home?g.away:g.home;
   return `<ol class="steps">
@@ -319,14 +322,14 @@ function renderTD(){
       <div class="row"><div><div class="pick" style="font-size:clamp(26px,7.4vw,38px)">${esc2(b.n)}</div><div class="match" style="margin-top:8px"><img src="${b.team===g.home?g.homeLogo:g.awayLogo}" alt="">${esc2(b.team)} ${b.team===g.home?"vs":"@"} ${esc2(opp)} · ${kick(g.date)}</div></div>
       <div style="text-align:right;flex:none"><div style="font:800 30px var(--mono)">${amer(b.price)}</div><div class="dim" style="font:700 12px var(--display)">FanDuel · $${TD.rule.stake}</div></div></div>
       <div class="meta"><span class="chip">Model <b>${b.p}%</b></span><span class="chip">Needs <b>${b.imp}%</b></span><span class="chip">Edge <b>+${b.edge}</b></span><span class="chip">EV <b>+$${(b.ev*TD.rule.stake).toFixed(2)}</b></span></div>
-      <details style="margin-top:14px"><summary style="cursor:pointer;font:800 13px var(--display);color:#ffffffcc">How this number was calculated ▾</summary>${tdSteps(b,g,t)}</details></div>`;
+      <div style="margin-top:14px;font:600 14px/1.5 var(--display);color:#ffffffe0"><div style="font:800 11px var(--display);letter-spacing:.14em;text-transform:uppercase;color:#ffffffaa">Why</div>${whyList(b)}</div><details class="math"><summary>Show the math ▾</summary>${tdSteps(b,g,t)}</details></div>`;
   } else $("tdBest").innerHTML="";
   $("tdSect").textContent=plays.length>1?`More ${lg==="nfl"?"NFL":"college"} TD plays · best first`:plays.length?"":"Anytime TD plays";
   $("tdPlays").innerHTML=plays.length?plays.slice(1).map((p,i)=>{ const g=gm(p.gid), t=g.teams.find(t=>t.team===p.team), opp=p.team===g.home?g.away:g.home;
     return `<div class="card" style="--i:${i}" onclick="if(!event.target.closest('.an'))this.classList.toggle('open')"><div class="top"><div class="logos"><img src="${p.team===g.home?g.homeLogo:g.awayLogo}" alt=""></div>
-      <div class="body"><div class="pick">${esc2(p.n)}</div><div class="sub">${esc2(p.team)} ${p.team===g.home?"vs":"@"} ${esc2(opp)} · ${kick(g.date)}</div><div class="bar"><i style="--w:${p.p}%"></i></div></div>
+      <div class="body"><div class="pick">${esc2(p.n)}</div><div class="sub">${esc2(p.team)} ${p.team===g.home?"vs":"@"} ${esc2(opp)} · ${kick(g.date)} · tap for why</div><div class="bar"><i style="--w:${p.p}%"></i></div></div>
       <div class="right"><div class="c">${amer(p.price)}</div><div class="s">${p.p}% vs ${p.imp}%</div><div class="stake">EV +$${(p.ev*TD.rule.stake).toFixed(2)}</div></div></div>
-      <div class="an"><div><div class="in"><h4>How it's calculated</h4>${tdSteps(p,g,t)}<h4>Check before betting</h4><p>The model reads the injury report but not depth-chart news. If he's been ruled out or benched, skip it.</p></div></div></div></div>`; }).join("")
+      <div class="an"><div><div class="in"><h4>Why</h4>${whyList(p)}<details class="math"><summary>Show the math ▾</summary>${tdSteps(p,g,t)}</details></div></div></div></div>`; }).join("")
     :`<div class="empty"><b>No ${lg==="nfl"?"NFL":"college"} TD plays right now</b>Nothing on FanDuel's board is priced long enough. Checked every 20 minutes.</div>`;
   $("tdNG").textContent=games.length;
   $("tdGames").innerHTML=games.map(g=>`<div class="mini" onclick="this.classList.toggle('open')"><div class="top"><div class="logos"><img src="${g.awayLogo}" alt=""><img src="${g.homeLogo}" alt=""></div><div class="t">${esc2(g.away)} @ ${esc2(g.home)}<small>${kick(g.date)}${g.priced?"":" · no FanDuel prices yet"}</small></div><div class="r">${g.teams.map(t=>t.players[0]?esc2(t.players[0].n.split(" ").slice(-1)[0]):"—").join(" · ")}<small>top: ${g.teams.map(t=>t.players[0]?t.players[0].p+"%":"—").join(" / ")}</small></div></div>
@@ -350,7 +353,7 @@ function renderTD(){
 document.querySelectorAll("#tdSeg button").forEach(b=>b.onclick=()=>{ TDLG=b.dataset.lg; try{ localStorage.setItem("edge-td-lg",TDLG); }catch(e){} renderTD(); });
 async function loadTD(){ try{ TD=await (await fetch("/api/td",{cache:"no-store"})).json(); renderTD(); }catch(e){ $("tdPlays").innerHTML='<div class="empty"><b>Reconnecting…</b></div>'; } }
 async function loadUp(){ try{ UP=await (await fetch("/api/upcoming",{cache:"no-store"})).json(); renderBoard(); }catch(e){ $("upd").textContent="reconnecting"; } }
-loadUp(); strip(); if(location.hash==="#hist"||location.hash==="#td") document.querySelector(`nav button[data-v=${location.hash.slice(1)}]`).click(); setInterval(()=>{ loadUp(); REC=null; strip(); },3*60e3);
+loadUp(); strip(); if(location.hash==="#hist"||location.hash==="#td") document.querySelector(`nav button[data-v=${location.hash.slice(1)}]`).click(); setInterval(()=>{ loadUp(); REC=null; strip(); if(!$("vTD").hidden) loadTD(); },3*60e3);
 setInterval(()=>{ const h=document.querySelector(".hero .tag"); if(h&&UP) renderBoard(); },60e3);
 if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
 </script></body></html>

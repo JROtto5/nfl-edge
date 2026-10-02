@@ -63,10 +63,32 @@ async function buildTD(){
   const L=log||{plays:{}}; const plays=[];
   const board=games.map(g=>{
     const teams=[g.away,g.home].map(team=>{ const hist=T.teamHistory(boxes,team,new Date(g.date));
-      const pl=T.teamLambdas(hist,T.implied(g,team),k[g.lg],g.lg,g.outSet[team]||new Set()).slice(0,8).map(x=>{
+      const all=T.teamLambdas(hist,T.implied(g,team),k[g.lg],g.lg,g.outSet[team]||new Set());
+      const imp_=T.implied(g,team), avg=g.lg==="nfl"?22:28, opp=team===g.home?g.away:g.home, fav=(team===g.home?g.spread<0:g.spread>0);
+      const rk=(f,x)=>1+all.filter(y=>y[f]>x[f]).length;
+      const gone=(all.gone||[]).filter(x=>x.lam>=.08).sort((a,b)=>b.lam-a.lam);
+      /* plain-English reasons, built from this player's own numbers */
+      const whyOf=(x,a,imp)=>{ const r=[];
+        const ra=Math.round(x.raS*100), tg=Math.round(x.tgS*100);
+        if(x.tgS>=.18) r.push(`He's ${team}'s ${rk("tgS",x)===1?"top target":"#"+rk("tgS",x)+" target"}: ${tg}% of the team's targets over the last ${x.gn} games.`);
+        if(x.raS>=.35) r.push(`He's the lead runner: ${ra}% of the carries. Carries near the goal line are where most TDs come from.`);
+        else if(x.raS>=.12&&x.tgS>=.12) r.push(`He also gets real carries (${ra}%), so he has two ways to score.`);
+        else if(x.raS>=.12) r.push(`He's a rotation back: ${ra}% of the carries. Not the main guy, but he gets steady work.`);
+        if(x.tgS>=.07&&x.tgS<.18&&x.raS<.12) r.push(`He's a secondary target: ${tg}% of the team's targets.`);
+        if(gone.length) r.push(`${gone.slice(0,2).map(y=>y.n).join(" and ")} ${gone.length>1?"are":"is"} out. ${gone.length>1?"Their":"His"} touches get spread to everyone else, which bumps his chance about ${Math.round((all.boost-1)*100)}%.`);
+        if(imp_>=avg+3) r.push(`${team} is expected to score ${imp_.toFixed(1)}, well above the ${g.lg==="nfl"?"NFL":"college"} average of about ${avg}. More points means more TDs to go around.`);
+        else if(imp_<=avg-4) r.push(`Caution: ${team} is only expected to score ${imp_.toFixed(1)}, so there are fewer TDs to go around.`);
+        if(fav&&Math.abs(g.spread)>=7&&x.raS>=.12) r.push(`${team} is a ${Math.abs(g.spread)}-point favorite. Teams that lead run the ball late, which helps backs.`);
+        if(x.tdc===0&&x.gn>=2) r.push(`He hasn't scored in his last ${x.gn} games despite the workload. Books lean on TD totals, so his price is longer than his role deserves. That's the value.`);
+        else if(x.tdc>=2) r.push(`He's scored ${x.tdc} TDs in his last ${x.gn} games, so the role is producing.`);
+        if(!x.last) r.push(`Heads up: he didn't play in ${team}'s last game. The model already cuts his chance for that. Confirm he's active.`);
+        if(a!=null&&x.p-imp>=.10) r.push(`Big gap from FanDuel's price. Sometimes that's real value, and sometimes the book knows something the box scores don't (a role change, or an injury not on the report yet). Check the news before betting.`);
+        if(a!=null) r.push(`FanDuel's ${a>0?"+"+a:a} only needs ${Math.round(imp*1000)/10}% to break even. The model has him at ${Math.round(x.p*1000)/10}%.`);
+        return r; };
+      const pl=all.slice(0,8).map(x=>{
         const a=prices[g.id]?prices[g.id][norm(x.n)]:undefined; const imp=a!=null?1/dec(a):null;
         const ev=a!=null?x.p*dec(a)-1:null;
-        return {id:x.id,n:x.n,p:Math.round(x.p*1000)/10,lam:Math.round(x.lam*1000)/1000,raw:Math.round(x.raw*1000)/10,ev:ev!=null?Math.round(ev*1000)/1000:null,price:a??null,imp:imp!=null?Math.round(imp*1000)/10:null,edge:imp!=null?Math.round((x.p-imp)*1000)/10:null,raS:Math.round(x.raS*100),tgS:Math.round(x.tgS*100)}; });
+        return {id:x.id,n:x.n,p:Math.round(x.p*1000)/10,lam:Math.round(x.lam*1000)/1000,raw:Math.round(x.raw*1000)/10,ev:ev!=null?Math.round(ev*1000)/1000:null,why:whyOf(x,a,imp),price:a??null,imp:imp!=null?Math.round(imp*1000)/10:null,edge:imp!=null?Math.round((x.p-imp)*1000)/10:null,raS:Math.round(x.raS*100),tgS:Math.round(x.tgS*100)}; });
       return {team,implied:Math.round(T.implied(g,team)*10)/10,xtd:Math.round(T.implied(g,team)*k[g.lg]*100)/100,games:hist.length,players:pl}; });
     // plays: model beats FanDuel's price by the margin, best edges first, max 3 a game
     const cand=teams.flatMap(t=>t.players.map(p=>({...p,team:t.team}))).filter(p=>p.price!=null&&p.p>=RULE.minP*100&&p.edge>=RULE.minEdge*100).sort((a,b)=>b.edge-a.edge).slice(0,RULE.perGame);

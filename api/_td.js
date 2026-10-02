@@ -67,20 +67,20 @@ function teamLambdas(hist,implied,k,lg,out=new Set()){
   if(!hist.length) return [];
   const pl={}; let RA=0,TG=0,RTD=0,CTD=0,W=0;
   hist.forEach((T,g)=>{ const w=Math.pow(P.decay,g); W+=w;
-    Object.entries(T.pl).forEach(([id,p])=>{ const q=pl[id]=pl[id]||{id,n:p.n,ra:0,tg:0,rtd:0,rctd:0,xtd:0,gp:0,last:false};
-      q.ra+=w*p.ra; q.tg+=w*p.tg; q.rtd+=w*p.rtd; q.rctd+=w*p.rctd; q.xtd+=w*p.xtd; q.gp+=w; if(g===0) q.last=true; RA+=w*p.ra; TG+=w*p.tg; RTD+=w*p.rtd; CTD+=w*p.rctd; }); });
+    Object.entries(T.pl).forEach(([id,p])=>{ const q=pl[id]=pl[id]||{id,n:p.n,ra:0,tg:0,rtd:0,rctd:0,xtd:0,gp:0,last:false,tdc:0,gn:0,rec:0};
+      q.ra+=w*p.ra; q.tg+=w*p.tg; q.rtd+=w*p.rtd; q.rctd+=w*p.rctd; q.xtd+=w*p.xtd; q.gp+=w; q.tdc+=p.rtd+p.rctd+p.xtd; q.gn++; if(g===0) q.last=true; RA+=w*p.ra; TG+=w*p.tg; RTD+=w*p.rtd; CTD+=w*p.rctd; }); });
   const fr=(RTD+1.5)/(RTD+CTD+3), a=P.alpha[lg], E=implied*k;
   let L=Object.values(pl).map(q=>{
     const raS=RA?q.ra/RA:0, tgS=TG?q.tg/TG:0;
     const rS=(q.rtd+a*raS)/(RTD+a), cS=(q.rctd+a*tgS)/(CTD+a);
     let lam=E*(fr*rS+(1-fr)*cS)+ .25*q.xtd/W;          // return / defensive TDs: small, real
     if(!q.last) lam*=P.absentMult;                       // missed his team's last game
-    return {id:q.id,n:q.n,lam,raS,tgS,tds:Math.round((q.rtd+q.rctd+q.xtd)/1)};
+    return {id:q.id,n:q.n,lam,raS,tgS,tdc:q.tdc,gn:q.gn,last:q.last};
   });
   // injuries: drop listed players, hand their share to everyone else
-  const before=L.reduce((s,x)=>s+x.lam,0); L=L.filter(x=>!out.has(x.id)&&!out.has(x.n));
+  const before=L.reduce((s,x)=>s+x.lam,0); const gone=L.filter(x=>out.has(x.id)||out.has(x.n)); L=L.filter(x=>!out.has(x.id)&&!out.has(x.n));
   const after=L.reduce((s,x)=>s+x.lam,0); if(after>0&&before>after) L.forEach(x=>x.lam*=Math.min(1.6,before/after));
-  return L.map(x=>({...x,raw:1-Math.exp(-x.lam),p:calib(1-Math.exp(-x.lam))})).sort((a,b)=>b.p-a.p);
+  const R=L.map(x=>({...x,raw:1-Math.exp(-x.lam),p:calib(1-Math.exp(-x.lam))})).sort((a,b)=>b.p-a.p); R.gone=gone; R.boost=after>0?Math.min(1.6,before/after):1; return R;
 }
 const implied=(g,team)=>{ const h=(g.total-g.spread)/2; return team===g.home?h:g.total-h; };   // spread is the home line
 
