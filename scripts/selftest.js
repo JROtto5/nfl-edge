@@ -20,7 +20,7 @@ class El{constructor(){this.dataset={};this.children=[];this.style={};this.hidde
   querySelectorAll(){return[];}querySelector(){return null;}setAttribute(){}removeAttribute(){}click(){}}
 
 function loadScript(){
-  const html=fs.readFileSync(path.join(ROOT,"index.html"),"utf8");
+  const html=fs.readFileSync(path.join(ROOT,"board.html"),"utf8");
   const script=[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(b=>b.includes("const state="));
   const j=script.lastIndexOf("})();");
   return script.slice(0,j)+"\nwindow.__T=()=>({state,bestPlay,topPlays,bestBets,edgesFor,callNumber,playProb,renderBest,invalidateEdges,recomputeExposure,isBusy:()=>detailRunning||detailQueue.length>0});\n"+script.slice(j);
