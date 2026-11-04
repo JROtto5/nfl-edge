@@ -1,11 +1,30 @@
 # The Edge Board
 
+[![Live demo](https://img.shields.io/badge/live%20demo-nfl--edge--kappa.vercel.app-2ea44f?logo=vercel&logoColor=white)](https://nfl-edge-kappa.vercel.app)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Deployed on Vercel](https://img.shields.io/badge/deployed%20on-Vercel-000000?logo=vercel&logoColor=white)](https://vercel.com)
+[![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8?logo=pwa&logoColor=white)](https://nfl-edge-kappa.vercel.app)
+[![No build step](https://img.shields.io/badge/build-none%20(vanilla%20JS)-lightgrey)](#run-locally)
+
 Live NFL + college football betting-edge board. Pulls weather, injuries, odds, line
 movement and in-game scores from ESPN's public feeds, runs them through a set of
 measured signals, and shows where the line looks wrong — with an honest record of how
 those calls actually did.
 
 **Live:** https://nfl-edge-kappa.vercel.app (installable as a phone app)
+
+![The Edge Board: the full board, one card per game with the call, stake, lines and every signal that fired](docs/screenshots/board.jpg)
+
+<table>
+<tr>
+<td width="50%"><a href="https://nfl-edge-kappa.vercel.app/picks"><img src="docs/screenshots/picks.jpg" alt="Edge Picks: the server-graded record with a running bankroll line per league, then every play for the next 7 days"></a></td>
+<td width="50%"><a href="https://nfl-edge-kappa.vercel.app/power"><img src="docs/screenshots/power.jpg" alt="Power Poll: Massey-style ratings, points better than an average team on a neutral field"></a></td>
+</tr>
+<tr>
+<td align="center"><b>Picks</b>: server-graded record and the next 7 days of plays</td>
+<td align="center"><b>Power Poll</b>: least-squares ratings, ordering = head-to-head order</td>
+</tr>
+</table>
 
 ## What it does
 
@@ -61,21 +80,123 @@ failed and are not shipped.
 
 ## Architecture
 
+No framework and no build step: static HTML/JS pages, a handful of Vercel Node
+functions, one Vercel Blob store for shared state, and a scheduler. The interesting
+decision is that **the server runs the front-end's own engine**, so the graded record
+can never disagree with what a viewer saw on their phone.
+
 ```
-index.html          single-file app (state, signals, projections, views)
+ ESPN public feeds                     Vercel functions (api/)                   Clients
+ ─────────────────                     ───────────────────────                   ───────
+ site.api.espn.com   ─┐
+   scoreboard/summary │   _espn.js  allow-listed fetcher, ~10s cache,     ┌─► board.html (full board)
+ sports.core.api      ├─► espn.js / bulk.js  (proxy, CDN-cached) ─────────┤   index.html (Today/History/TDs)
+   odds, closers      │                                                   │   picks.html, power.html
+ pickcenter, injuries ┘   _engine.js  runs board.html's script in a       │
+                          Node vm with a stubbed DOM                      │
+                              │  signals → stacking → calls → grading     │
+                              ▼                                           │
+                          cron/grade.js ──► Blob: edge/record.json ──► record.js
+                              │                                           │
+                              └─► _push.js ── Web Push (VAPID) ──► sw.js  │
+                          _scan.js  ──► upcoming.js  (7-day model read)   │
+                          _power.js ──► power.js     (Power Poll)    ─────┘
+                          _tdbuild.js ► td.js        (anytime-TD board)
+```
+
+### Data flow: feeds → signals → stacking → picks → grading
+
+1. **Ingest.** Every ESPN request goes through `api/_espn.js` (see below for why).
+   It allow-lists hosts, clamps `limit` to ESPN's real ceiling of 500, rebuilds dead
+   `dates=A-B` ranges day by day, and reports upstream failures as failures, never as
+   an empty slate. `api/bulk.js` batches a whole slate's summary calls into one round trip.
+2. **Signals.** The board engine (in `board.html`) turns scoreboard, summary, odds,
+   injuries, weather and live scores/lines into ~30 boolean/graded signals per game,
+   each carrying a weight measured in the backtests above.
+3. **Projections.** `api/_power.js` solves a regularised weighted least-squares system,
+   `(AᵀWA + Λ)x = AᵀWb + Λμ` (plain Gaussian elimination, ~300 unknowns), over closing
+   spreads (weight 2) and capped final margins (weight 1), with recency half-lives, a
+   light FBS/FCS prior and a fitted home-field term, to get one neutral-field rating per team. That is blended with
+   ESPN's matchup predictor and injury adjustments into a projected line. A fitted
+   21-feature logistic totals model (`api/_logit.json`) scores every total.
+4. **Stacking and verdicts.** Signals that agree on a side are summed by evidence
+   weight, and conflicts are surfaced rather than cancelled. `verdict.js` is **the one
+   rule set** deciding PLAY / LEAN / none and confidence, and the same file is loaded by
+   the browser and by the server (`api/_applog.js`), so the history tab is literally
+   "what this app would have played". Strong plays get a hit probability and a
+   quarter-Kelly stake.
+5. **Freeze and grade.** A call is logged the moment it first appears, with the line
+   frozen. `api/cron/grade.js` loads the shared record from Blob, runs the engine
+   against live data (`api/_engine.js`), grades finals against the *called* number,
+   computes closing-line value, and writes `edge/record.json` back. Every device reads
+   that one document via `GET /api/record`.
+
+### Scheduling
+
+- **GitHub Actions** (`.github/workflows/grade.yml`) pings `/api/cron/grade` every
+  10 minutes with a shared key, then warms `/api/td` and `/api/power`.
+- **`/api/tick`** is a public, rate-limited backstop: any open board calls it, and if
+  the shared record is more than 8 minutes old it runs the same grader in-process.
+  It needs no key because it can only ever do the scheduled job.
+- Derived documents (`upcoming`, `power`, `applog`, `td`) are rebuilt at most every
+  20 to 30 minutes and cached in Blob plus the CDN (`s-maxage` + `stale-while-revalidate`).
+
+### Web Push
+
+`api/subscribe.js` hands the browser the VAPID public key and stores
+`PushSubscription`s. After each grading run `api/_push.js` sends only the alerts newer
+than the last push (new call, line move, live bet, fade, result) and collapses bursts
+of more than four into one summary. Dead endpoints (404/410) are pruned. The Blob store
+is public-read, so subscriptions live at a path derived from a secret: the unguessable
+path is what keeps those capability URLs private. `sw.js` shows the notification and
+deep-links to `/#alerts`.
+
+### Offline and caching (`sw.js`)
+
+The app shell (HTML, icons, `verdict.js`, manifest) is stale-while-revalidate so the
+installed PWA opens instantly. **Live data is network-only and never cached**: a
+stale odds line or old weather reading is worse than nothing for a tool like this.
+`/api/*` bypasses the worker entirely.
+
+### Files
+
+```
+board.html          the full board: state, signals, projections, stacking, all views
+index.html          mobile Today / History / TDs view over the server documents
+picks.html          server-graded record + every play for the next 7 days
+power.html          Edge Power Poll (college Top 25, NFL)
 intro.html          45s animated intro, Web Audio synthesized music
-sw.js               PWA service worker: page network-first, ESPN + /api never cached
+verdict.js          the single PLAY/LEAN rule set, shared by browser and server
+sw.js               PWA service worker: shell stale-while-revalidate, live data network-only
 api/_espn.js        server-side ESPN fetcher: allow-listed hosts, ~10s memory cache,
                     limit clamped to ESPN's real max of 500, and dead `dates=A-B`
                     scoreboard ranges rebuilt day-by-day
 api/espn.js         GET  /api/espn?u=<espn url>     single proxied call, CDN-cached
 api/bulk.js         POST /api/bulk {urls:[...]}     one round-trip per batch of games
+api/_engine.js      runs board.html's engine in a Node vm (stubbed DOM, seeded localStorage)
+api/cron/grade.js   GET  /api/cron/grade?key=…     scheduled grader + push fan-out
+api/tick.js         GET  /api/tick                 public backstop for the scheduler
+api/record.js       GET  /api/record               the shared graded record
+api/_scan.js        7-day slate scanner (totals model + surviving rule signals)
+api/upcoming.js     GET  /api/upcoming
+api/_power.js       weighted least-squares power ratings
+api/power.js        GET  /api/power
+api/_applog.js      2026 season replayed through verdict.js, graded vs the closer
+api/applog.js       GET  /api/applog
+api/_td.js, _tdbuild.js, td.js   anytime-TD model, play log and backtest
+api/_push.js        Web Push (VAPID) fan-out
+api/subscribe.js    GET/POST /api/subscribe        VAPID key, (un)subscribe, test push
+api/_store.js       tiny JSON-document layer over Vercel Blob
+api/_logit.json     fitted totals-model coefficients
 scripts/selftest.js dev: runs the page in a Node vm against live ESPN and asserts
-scripts/dev-server.js  dev: static files + the real /api handlers on localhost
+scripts/dev-server.js  dev: static files + the real /api/espn and /api/bulk handlers
+reports/            offline analysis scripts and write-ups
 manifest.webmanifest, icon-*.png
 ```
 
-**All ESPN traffic must go through `/api`.** ESPN's Akamai edge answers browser-shaped
+### Why all ESPN traffic goes through `/api`
+
+ESPN's Akamai edge answers browser-shaped
 cross-origin requests (real user-agent + `Origin` + `Sec-Fetch-*`) with **403 and no
 `Access-Control-Allow-Origin`**, so the old client-side "fall back to calling ESPN
 directly" path fails CORS every time and a purely static copy no longer loads data.
@@ -86,6 +207,40 @@ Data sources: `site.api.espn.com` scoreboard + summary (odds, weather, injuries,
 predictor, last-five, pickcenter), `sports.core.api.espn.com` odds (keeps the
 pregame closer and the live line after kickoff; retains closing odds for completed
 games, which is what makes the backtests possible).
+
+## Run locally
+
+Requires Node 18+ (for global `fetch`). There is nothing to compile.
+
+```
+git clone https://github.com/JROtto5/nfl-edge && cd nfl-edge
+npm install
+node scripts/dev-server.js        # http://localhost:4399/board
+```
+
+The dev server serves the static pages and the real ESPN proxy handlers, which is
+enough for the full board (`/board`) to load live data. The server-backed views
+(record, picks, power poll, push) need the Blob store and the rest of `api/`, so run
+them under the Vercel CLI against your own project:
+
+```
+vercel link
+vercel env pull .env.local        # or create it yourself with the names below
+vercel dev
+```
+
+Environment variables (names only; set the values in your Vercel project):
+
+| Variable | Used by | Purpose |
+|---|---|---|
+| `BLOB_READ_WRITE_TOKEN` | `api/_store.js` (via `@vercel/blob`) | read/write the shared JSON documents |
+| `CRON_KEY` | `api/cron/grade.js`, `api/tick.js`, GitHub Actions secret | authorises the scheduled grader |
+| `VAPID_PUBLIC`, `VAPID_PRIVATE` | `api/_push.js`, `api/subscribe.js` | Web Push key pair (`npx web-push generate-vapid-keys`) |
+| `VAPID_SUBJECT` | `api/_push.js` | contact `mailto:` for push services |
+| `PUSH_SECRET` | `api/_push.js` | unguessable path segment for the subscription document |
+
+Push is optional: without the VAPID variables `/api/subscribe` answers 503 and
+everything else keeps working.
 
 ## Testing
 
@@ -117,3 +272,15 @@ vercel --prod
 - Calls are graded against the number that was actually called, never a later one.
 - Negative backtest results are shown, and they lower the signal's weight.
 - Nothing here places a bet or promises anything. Reference math only.
+
+## Responsible use
+
+This is a sports-analytics and entertainment project. It does not place bets, it is
+not financial or gambling advice, and past results (including the backtests above) do
+not guarantee future ones. Check the laws where you live, only risk what you can afford
+to lose, and if gambling stops being fun, help is available at 1-800-GAMBLER
+(US) or [ncpgambling.org](https://www.ncpgambling.org).
+
+## License
+
+[MIT](LICENSE) © 2026 JROtto5
