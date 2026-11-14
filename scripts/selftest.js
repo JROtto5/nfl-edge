@@ -144,6 +144,20 @@ ok("it explains the bar it failed, and does not blame missing data",
    /clears the bar/.test(html)&&/not a gap in the data/.test(html));
 T.state.games=gamesBackup; T.state.league="all"; T.invalidateEdges(); T.recomputeExposure();
 
+console.log("\n— verdict.js: the 55–58% model tier is a stake only in weeks 1–6 (2026-11-14 decay fix) —");
+{
+  const V=require(path.join(ROOT,"verdict.js"));
+  const cfb=(wk,conf,dir="OVER",flags={})=>({lg:"cfb",wk,total:55.5,spread:-7,state:"post",hs:30,as:28,model:{dir,conf},
+    flags:{dogimp10:false,lowlast:false,rankclash:false,unrfavfcs:false,...flags},dogImp:24,home:"AAA",away:"BBB",fav:"AAA",dog:"BBB"});
+  const plays=g=>V.playsOf(g).filter(x=>x.lab.startsWith("OVER")||x.lab.startsWith("UNDER"));
+  ok("55–58% model call in week 6 is a staked play", plays(cfb(6,56.5)).length===1);
+  ok("the same call in week 7 is a lean, not a stake", plays(cfb(7,56.5)).length===0&&V.verdict(cfb(7,56.5)).tier==="lean"&&V.verdict(cfb(7,56.5)).dir==="OVER");
+  ok("58%+ is still a play late in the season", plays(cfb(11,59.1,"UNDER")).length===1);
+  ok("no week on the game never gates", plays(cfb(undefined,56.5)).length===1);
+  ok("dog-implied-<=10 OVER stays a play late in the season", plays(cfb(11,56.5,"OVER",{dogimp10:true})).length===1);
+  ok("the late gate starts at week 7", V.LATE_WK===7);
+}
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail?1:0);
 })().catch(e=>{ console.error("harness error:",e); process.exit(1); });

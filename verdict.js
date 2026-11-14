@@ -1,15 +1,19 @@
 /* THE rule set for Edge — shared by the app (index.html) and the server (api/_applog.js).
    verdict(g) -> {tier, dir, conf, side, why}; playsOf(g) -> staked plays; result()/sideResult() grade them. */
 /* ---- the one rule set: what's a PLAY, what's a LEAN, and how confident ---- */
+/* From this week of the season on, the model's 55–58% tier is a lean, not a stake (see CHANGELOG.md, 2026-11-14). */
+const LATE_WK=7;
 function verdict(g){
   if(g.noLine) return {tier:"none",why:["No line posted yet."]};
   const m=g.model, f=g.flags, why=[]; let pick=null;
+  const late=typeof g.wk==="number"&&g.wk>=LATE_WK;   // unknown week (no g.wk) never gates
   if(g.lg==="cfb"){
-    if(f.dogimp10&&!(m.dir==="UNDER"&&m.conf>=55)){ pick={dir:"OVER",tier:"play",conf:Math.max(60,m.dir==="OVER"?m.conf:0)}; why.push(`Big mismatch: the underdog is expected to score only ~${g.dogImp}. Backups and garbage-time scores push these over — this signal is 41–20 this season.`); }
-    if(m.conf>=58&&(!pick||pick.dir===m.dir)){ pick={dir:m.dir,tier:"play",conf:Math.max(pick?pick.conf:0,Math.min(65,m.conf))}; why.push(`The totals model is ${m.conf}% on the ${m.dir} — its strongest tier, which hit ~60% on seasons it had never seen.`); }
-    else if(!pick&&m.conf>=55){ pick={dir:m.dir,tier:"play",conf:m.conf}; why.push(`The totals model is ${m.conf}% on the ${m.dir}. This 55–58% tier has gone 36–24 (60%) in college this season.`); }
-    else if(!pick&&m.conf>=52&&f.lowlast&&m.dir==="OVER"){ pick={dir:"OVER",tier:"lean",conf:55}; why.push(`A team is coming off a ≤30-point game (college overs after that: 15–9 this season) and the model tilts over at ${m.conf}%.`); }
-    if(pick&&pick.dir==="OVER"&&f.lowlast&&pick.tier==="play") why.push("One of these teams just played a ≤30-point game — totals over-correct after those (15–9 this season).");
+    if(f.dogimp10&&!(m.dir==="UNDER"&&m.conf>=55)){ pick={dir:"OVER",tier:"play",conf:Math.max(60,m.dir==="OVER"?m.conf:0)}; why.push(`Big mismatch: the underdog is expected to score only ~${g.dogImp}. Backups and garbage-time scores push these over — OVER hit 54 / 56 / 58% in 2023–25 and 62% (51–31) in 2026. Nearly all of these games are weeks 1–3.`); }
+    if(m.conf>=58&&(!pick||pick.dir===m.dir)){ pick={dir:m.dir,tier:"play",conf:Math.max(pick?pick.conf:0,Math.min(65,m.conf))}; why.push(`The totals model is ${m.conf}% on the ${m.dir} — its strongest tier: 60 / 68 / 58% across 2023–25 and 54% (21–18) in 2026.`); }
+    else if(!pick&&m.conf>=55&&late){ pick={dir:m.dir,tier:"lean",conf:m.conf}; why.push(`The totals model is ${m.conf}% on the ${m.dir}, but this 55–58% tier is a lean after week ${LATE_WK-1}: weeks 7+ it hit 56 / 58 / 47% in 2023–25 and 48% (24–26) in 2026, against 59 / 56 / 69 / 53% in weeks 1–6.`); }
+    else if(!pick&&m.conf>=55){ pick={dir:m.dir,tier:"play",conf:m.conf}; why.push(`The totals model is ${m.conf}% on the ${m.dir}. In weeks 1–6 this 55–58% tier hit 59 / 56 / 69% in 2023–25 and 53% (30–27) in 2026.`); }
+    else if(!pick&&m.conf>=52&&f.lowlast&&m.dir==="OVER"){ pick={dir:"OVER",tier:"lean",conf:55}; why.push(`A team is coming off a ≤30-point game (college overs after that, with the model leaning over: 58 / 67 / 56% in 2023–25, 49% in 2026) and the model tilts over at ${m.conf}%.`); }
+    if(pick&&pick.dir==="OVER"&&f.lowlast&&pick.tier==="play") why.push("One of these teams just played a ≤30-point game — totals over-correct after those (58 / 67 / 56% in 2023–25, but only 49% in 2026).");
     if(pick&&f.rankclash&&pick.dir==="UNDER") why.push("Ranked vs ranked — these have leaned under the last three seasons.");
   } else {
     if(f.bothunder&&m.dir==="OVER"&&m.conf>=55){ pick={dir:"OVER",tier:"play",conf:Math.min(62,Math.max(58,m.conf))}; why.push(`Both teams' last game went under the total — NFL totals over-correct after that (over hit 55 / 59 / 63% the last three seasons) — and the model agrees at ${m.conf}%.`); }
@@ -24,7 +28,7 @@ function verdict(g){
     if(crossed){ side={team:dog,line:+a,tier:"lean",conf:56}; why.push(`<b>Side lean:</b> the line moved through ${o<3&&a>=3?"3":"7"} toward the favorite (${o} → ${a}). Dogs getting a key number this way: 58% the last two seasons, 5–1 this season.`); }
     else if(a>=7&&a<=9.5){ side={team:dog,line:+a,tier:"lean",conf:56}; why.push(`<b>Side lean:</b> NFL dogs of +7 to +9.5 covered 57% the last three seasons and are 5–2 this season.`); }
     else if(a>=0.5&&a<=2.5){ side={team:favT,line:-a,tier:"lean",conf:55}; why.push(`<b>Side lean:</b> small NFL favorites (0.5–2.5) covered 55% the last three seasons and are 5–1 this season.`); } }
-  if(f.unrfavfcs){ side={team:g.fav,line:-Math.abs(g.spread),tier:"play",conf:60}; why.push(`<b>Side:</b> ${g.fav} is unranked and laying ${Math.abs(g.spread)} to an FCS school. Unranked favorites keep their foot down in these games — the favorite has covered 52–32 (62%) this season.`); }
+  if(f.unrfavfcs){ side={team:g.fav,line:-Math.abs(g.spread),tier:"play",conf:60}; why.push(`<b>Side:</b> ${g.fav} is unranked and laying ${Math.abs(g.spread)} to an FCS school. Unranked favorites keep their foot down in these games — the favorite covered 43 / 58 / 59% in 2023–25 (it failed 2023) and 60% (53–36) in 2026.`); }
   if(!pick&&!side) return {tier:"none",why:why.length?why:["Nothing measured says this line is off — the book's number looks fair."]};
   if(!pick) return {tier:side.tier==="play"?"play":"none",conf:side.conf,dir:null,side,why};
   return {...pick,side,why};
@@ -37,4 +41,4 @@ function playsOf(g){ const v=verdict(g), out=[];
   if(v.side&&v.side.tier==="play") out.push({g,v,lab:`${v.side.team} ${v.side.line}`,conf:v.side.conf,r:sideResult(g,v.side),amt:10,price:null});
   return out; }
 
-if(typeof module!=="undefined") module.exports={verdict,result,sideResult,playsOf};
+if(typeof module!=="undefined") module.exports={LATE_WK,verdict,result,sideResult,playsOf};
