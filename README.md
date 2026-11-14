@@ -53,19 +53,33 @@ those calls actually did.
 Every rule is judged on three full seasons and must beat break-even (52.4%) in **each**
 season. Only three-for-three signals can make a strong call on their own.
 
-| Signal | NFL | College | Status |
+| Signal | NFL | College | College 2026 (out of sample, to Nov 14) | Status |
+|---|---|---|---|---|
+| Our ratings vs closer, 3+ pt gap, week 10+ | **56.5%** (54 / 59 / 57) | 50.4% | not re-run | NFL strong; CFB held at lean |
+| Total 60+ → UNDER | — | 56.1% (55 / 61 / 53) | **35.7%** (20–36) | **lean** — failed 2026 |
+| Dog implied ≤10 pts → OVER | — | **57.6%** (54 / 56 / 58 / **62**) | **62.2%** (51–31) | strong (almost all weeks 1–3) |
+| Both teams' last game went UNDER → OVER | **58.4%** (55 / 59 / 63) | 53.6% | not re-run | not live yet |
+| Favorites of 10+ | 56.2% (52 / 58 / 58) | — | — | lean (thin) |
+| Ranked vs ranked → UNDER | — | 56.7% (51 / 56 / 62) | not re-run | lean |
+| Unranked laying 21+ vs FCS → favorite | — | 53.1% (**43** / 58 / 59) | 59.6% (53–36) | the app stakes it; it failed 2023, so by the house rule it is a lean (see CHANGELOG) |
+| Dog +7 to +9.5 | 57.5% (49 / 66 / 58) | — | — | lean |
+| Ranked laying 28+ vs FBS → dog | — | 53.0% (51 / 43 / 62) | not re-run | lean |
+| Totals model ≥58% confidence (all games) | — | 59.5 / 67.7 / 57.7% | 53.8% (21–18) | strong (small 2026 sample) |
+| Totals model 55–58%, **weeks 1–6** (staked plays) | — | 58.6 / 56.3 / 69.1% | 52.6% (30–27) | play |
+| Totals model 55–58%, **week 7+** | — | 55.8 / 57.7 / 46.8% | 48.0% (24–26) | **lean since 2026-11-14** |
+| Primetime dog, 4pm over, held-to-≤7, rested-team fade, total ≤45 under | one-season wonders | | | removed |
+| Home dogs, always-over, divisional under, revenge, rest | coin flips | coin flips | | not signals |
+
+**What the app's own college rules (`verdict.js`) would have played**, graded on closing lines (staked plays only):
+
+| Season | Plays | Totals | Sides |
 |---|---|---|---|
-| Our ratings vs closer, 3+ pt gap, week 10+ | **56.5%** (54 / 59 / 57) | 50.4% | NFL strong; CFB held at lean |
-| Total 60+ → UNDER | — | **56.1%** (55 / 61 / 53) | strong |
-| Dog implied ≤10 pts → OVER | — | **56.0%** (54 / 56 / 58) | strong |
-| Both teams' last game went UNDER → OVER | **58.4%** (55 / 59 / 63) | 53.6% | not live yet |
-| Favorites of 10+ | 56.2% (52 / 58 / 58) | — | lean (thin) |
-| Ranked vs ranked → UNDER | — | 56.7% (51 / 56 / 62) | lean |
-| Unranked laying 21+ vs FCS → favorite | — | 53.1% (**43** / 58 / 59) | lean |
-| Dog +7 to +9.5 | 57.5% (49 / 66 / 58) | — | lean |
-| Ranked laying 28+ vs FBS → dog | — | 53.0% (51 / 43 / 62) | lean |
-| Primetime dog, 4pm over, held-to-≤7, rested-team fade, total ≤45 under | one-season wonders | | removed |
-| Home dogs, always-over, divisional under, revenge, rest | coin flips | coin flips | not signals |
+| 2023 | 147–126 (53.8%) | 116–85 (57.7%) | 31–41 (43.1%) |
+| 2024 | 147–100 (59.5%) | 110–73 (60.1%) | 37–27 (57.8%) |
+| 2025 | 160–105 (60.4%) | 119–76 (61.0%) | 41–29 (58.6%) |
+| 2026 to Nov 14 | 148–109 (57.6%) | 95–73 (56.5%) | 53–36 (59.6%) |
+
+(Before the 2026-11-14 change: 2023 195–164, 2024 203–141, 2025 211–163, 2026 172–135. The 2023–25 totals model was fit on those seasons, so those three rows are in-sample for the model; 2026 is the only out-of-sample year. College games cover FBS only here, 2023 open lines are missing for 486 of 868 games.)
 
 A second wall used true opening/closing lines (line-movement rules: nothing except a move against a ranked team, 58/58/53%) and full box scores (yards per play, turnovers, third downs: nothing — the market prices efficiency; turnover-luck "regression" is a stable loser at 44%). Closing-line-value per spot drives a bet-timing note on every call.
 
