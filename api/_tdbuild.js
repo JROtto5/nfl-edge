@@ -1,9 +1,9 @@
 /* Builds the TD board: model every NFL + college game in the next 4 days, attach FanDuel
    anytime-TD prices, pick plays, freeze them into the log at the price shown, grade them
    from the final box score, and recompute the backtest over every 2026 game. */
-const T=require("./_td.js"); const {fetchOne}=require("./_espn.js"); const {readJSON,writeJSON}=require("./_store.js");
+const T=require("./_td.js"); const C=require("./_tdcal.js"); const {fetchOne}=require("./_espn.js"); const {readJSON,writeJSON}=require("./_store.js");
 const FD={nfl:"nfl",cfb:"ncaaf"}, AK="FhMFpcPWXMeyZxOx", FDB="https://sbapi.nj.sportsbook.fanduel.com/api";
-const RULE={minP:.25, minEdge:.05, perGame:3, stake:5};      // TD plays are long odds → $5 a play
+const RULE={minP:.25, minEdge:C.MIN_RAW_EDGE, cap:C.EDGE_CAP, shrink:C.K_SHRINK, perGame:3, stake:5};      // TD plays are long odds → $5 a play
 const OUT=/^(out|doubtful|injured reserve|suspension|suspended)/i;
 const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\b(jr|sr|ii|iii|iv|v)\b\.?/g,"").replace(/[^a-z0-9 ]/g,"").replace(/\bstate\b/g,"st").replace(/\s+/g," ").trim();
 const dec=a=>a>0?1+a/100:1+100/Math.abs(a);
@@ -82,18 +82,20 @@ async function buildTD(){
         if(x.tdc===0&&x.gn>=2) r.push(`He hasn't scored in his last ${x.gn} games despite the workload. Books lean on TD totals, so his price is longer than his role deserves. That's the value.`);
         else if(x.tdc>=2) r.push(`He's scored ${x.tdc} TDs in his last ${x.gn} games, so the role is producing.`);
         if(!x.last) r.push(`Heads up: he didn't play in ${team}'s last game. The model already cuts his chance for that. Confirm he's active.`);
-        if(a!=null&&x.p-imp>=.10) r.push(`Big gap from FanDuel's price. Sometimes that's real value, and sometimes the book knows something the box scores don't (a role change, or an injury not on the report yet). Check the news before betting.`);
-        if(a!=null) r.push(`FanDuel's ${a>0?"+"+a:a} only needs ${Math.round(imp*1000)/10}% to break even. The model has him at ${Math.round(x.p*1000)/10}%.`);
+        if(a!=null&&x.mdl-imp>C.EDGE_CAP) r.push(`Watch only: the raw model is more than ${C.EDGE_CAP*100} points above FanDuel's price. Gaps that big have lost money (the book usually knows about a role change or an injury). Not a play.`);
+        if(a!=null) r.push(`FanDuel's ${a>0?"+"+a:a} only needs ${Math.round(imp*1000)/10}% to break even. The raw model says ${Math.round(x.mdl*1000)/10}%; we show ${Math.round(x.p*1000)/10}% because the model has run too high against the book.`);
         return r; };
       const pl=all.slice(0,8).map(x=>{
         const a=prices[g.id]?prices[g.id][norm(x.n)]:undefined; const imp=a!=null?1/dec(a):null;
+        const model=x.p; x.mdl=model; const gap=imp!=null?model-imp:null;
+        if(imp!=null) x.p=imp+C.K_SHRINK*(model-imp);          // shown chance = book's price pulled a quarter of the way toward the model
         const ev=a!=null?x.p*dec(a)-1:null;
-        return {id:x.id,n:x.n,p:Math.round(x.p*1000)/10,lam:Math.round(x.lam*1000)/1000,raw:Math.round(x.raw*1000)/10,ev:ev!=null?Math.round(ev*1000)/1000:null,why:whyOf(x,a,imp),price:a??null,imp:imp!=null?Math.round(imp*1000)/10:null,edge:imp!=null?Math.round((x.p-imp)*1000)/10:null,raS:Math.round(x.raS*100),tgS:Math.round(x.tgS*100)}; });
+        return {id:x.id,n:x.n,p:Math.round(x.p*1000)/10,model:Math.round(model*1000)/10,gap:gap!=null?Math.round(gap*1000)/10:null,play:imp!=null&&model>=RULE.minP&&gap>=C.MIN_RAW_EDGE&&gap<=C.EDGE_CAP&&x.p-imp>=C.MIN_EDGE,watch:imp!=null&&model>=RULE.minP&&gap>C.EDGE_CAP,lam:Math.round(x.lam*1000)/1000,raw:Math.round(x.raw*1000)/10,ev:ev!=null?Math.round(ev*1000)/1000:null,why:whyOf(x,a,imp),price:a??null,imp:imp!=null?Math.round(imp*1000)/10:null,edge:imp!=null?Math.round((x.p-imp)*1000)/10:null,raS:Math.round(x.raS*100),tgS:Math.round(x.tgS*100)}; });
       return {team,implied:Math.round(T.implied(g,team)*10)/10,xtd:Math.round(T.implied(g,team)*k[g.lg]*100)/100,games:hist.length,players:pl}; });
     // plays: model beats FanDuel's price by the margin, best edges first, max 3 a game
-    const cand=teams.flatMap(t=>t.players.map(p=>({...p,team:t.team}))).filter(p=>p.price!=null&&p.p>=RULE.minP*100&&p.edge>=RULE.minEdge*100).sort((a,b)=>b.edge-a.edge).slice(0,RULE.perGame);
+    const cand=teams.flatMap(t=>t.players.map(p=>({...p,team:t.team}))).filter(p=>p.play).sort((a,b)=>b.edge-a.edge).slice(0,RULE.perGame);
     cand.forEach(p=>{ const key=g.id+"|"+p.id; const rec=L.plays[key];
-      if(!rec) L.plays[key]={key,gid:g.id,lg:g.lg,date:g.date,away:g.away,home:g.home,team:p.team,pid:p.id,n:p.n,price:p.price,p:p.p,edge:p.edge,amt:RULE.stake,firstTs:now,result:null};
+      if(!rec) L.plays[key]={key,gid:g.id,lg:g.lg,date:g.date,away:g.away,home:g.home,team:p.team,pid:p.id,n:p.n,price:p.price,p:p.p,model:p.model,gap:p.gap,edge:p.edge,amt:RULE.stake,firstTs:now,result:null};
       plays.push({...p,gid:g.id,lg:g.lg,date:g.date,away:g.away,home:g.home,awayLogo:g.awayLogo,homeLogo:g.homeLogo,logged:L.plays[key]}); });
     return {id:g.id,lg:g.lg,date:g.date,away:g.away,home:g.home,awayLogo:g.awayLogo,homeLogo:g.homeLogo,awayName:g.awayName,homeName:g.homeName,total:g.total,spread:g.spread,priced:!!prices[g.id],teams};
   });

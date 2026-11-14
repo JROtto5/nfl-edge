@@ -9,7 +9,7 @@
    • Players listed Out / Doubtful / IR are removed and their share is handed to the rest.
    Plays = model chance beats FanDuel's anytime price by a margin. Every play is logged
    with the price at the time and graded from the final box score. */
-const {fetchOne}=require("./_espn.js");
+const {fetchOne}=require("./_espn.js"); const C=require("./_tdcal.js");
 const SITE={nfl:"https://site.api.espn.com/apis/site/v2/sports/football/nfl",cfb:"https://site.api.espn.com/apis/site/v2/sports/football/college-football"};
 /* tuned on every 2026 game (log-loss): opportunity share dominates (alpha 30), missing the
    last game is a mild penalty, then a pooled Platt calibration pulls the top end in. */
@@ -62,11 +62,18 @@ function tdPerPoint(boxes,lg){ let td=0,pts=0; boxes.forEach(b=>{ if(b.lg!==lg) 
 function teamHistory(boxes,team,before){
   return boxes.filter(b=>b.t[team]&&new Date(b.date)<before).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,P.games).map(b=>b.t[team]);
 }
+/* role collapse: he averaged real touches (carries+targets) before, and in his last N games well under a third of that */
+function collapsed(hist,id,cal){
+  const t=T=>{ const p=T.pl[id]; return p?p.ra+p.tg:0; }, N=cal.COLLAPSE_GAMES, older=hist.slice(N);
+  if(older.length<2) return false;
+  const was=older.reduce((s,T)=>s+t(T),0)/older.length; if(was<cal.COLLAPSE_MIN_TOUCH) return false;
+  return hist.slice(0,N).reduce((s,T)=>s+t(T),0)/N < cal.COLLAPSE_RATIO*was;
+}
 /* expected TD rate per player for one team, given implied points */
-function teamLambdas(hist,implied,k,lg,out=new Set()){
+function teamLambdas(hist,implied,k,lg,out=new Set(),cal=C){
   if(!hist.length) return [];
   const pl={}; let RA=0,TG=0,RTD=0,CTD=0,W=0;
-  hist.forEach((T,g)=>{ const w=Math.pow(P.decay,g); W+=w;
+  hist.forEach((T,g)=>{ const w=Math.pow(P.decay,g)*(g<cal.RECENT_GAMES?cal.RECENT_BOOST:1); W+=w;
     Object.entries(T.pl).forEach(([id,p])=>{ const q=pl[id]=pl[id]||{id,n:p.n,ra:0,tg:0,rtd:0,rctd:0,xtd:0,gp:0,last:false,tdc:0,gn:0,rec:0};
       q.ra+=w*p.ra; q.tg+=w*p.tg; q.rtd+=w*p.rtd; q.rctd+=w*p.rctd; q.xtd+=w*p.xtd; q.gp+=w; q.tdc+=p.rtd+p.rctd+p.xtd; q.gn++; if(g===0) q.last=true; RA+=w*p.ra; TG+=w*p.tg; RTD+=w*p.rtd; CTD+=w*p.rctd; }); });
   const fr=(RTD+1.5)/(RTD+CTD+3), a=P.alpha[lg], E=implied*k;
@@ -75,6 +82,7 @@ function teamLambdas(hist,implied,k,lg,out=new Set()){
     const rS=(q.rtd+a*raS)/(RTD+a), cS=(q.rctd+a*tgS)/(CTD+a);
     let lam=E*(fr*rS+(1-fr)*cS)+ .25*q.xtd/W;          // return / defensive TDs: small, real
     if(!q.last) lam*=P.absentMult;                       // missed his team's last game
+    if(collapsed(hist,q.id,cal)) lam=0;                  // role collapsed over his last games: old shares are stale
     return {id:q.id,n:q.n,lam,raS,tgS,tdc:q.tdc,gn:q.gn,last:q.last};
   });
   // injuries: drop listed players, hand their share to everyone else
