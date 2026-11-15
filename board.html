@@ -1792,14 +1792,16 @@ function edgesForRaw(g){
     if(temp!=null&&temp<=25) E.push({k:"lean",dir:"UNDER",cat:"cold",play:`Lean UNDER ${total??""} — cold`,why:`${temp}°F at kickoff. Hard ball, stiff hands, shorter kicks — scoring dips in the deep cold.`});
   }
 
-  // INJURIES — QB out is the single biggest roster edge
+  // INJURIES — QB out is the single biggest roster edge.
+  // NFL: never a staked/logged call. 2026 record 20-29 (41%, 95% CI 28-55%) as 'strong'; alone 3-12; 19 of 36 games logged BOTH sides
+  // (17-17-2, a built-in hedge); no 2023-25 backtest exists, so it cannot meet the 52.4%-in-each-season house rule. Shown as a lean only.
   const inj=d.inj||[];
   inj.forEach(t=>{
     const opp=t.ab===g.home.ab?g.away.ab:(t.ab===g.away.ab?g.home.ab:null);
     (t.list||[]).forEach(p=>{
       const outish=/out|doubtful|injured reserve/i.test(p.st||"");
       if(!outish) return;
-      if(p.pos==="QB") E.push({k:"strong",dir:opp,cat:"qbout",play:`Fade ${t.ab} — QB out`,why:`${p.nm} (QB) listed ${p.st}${p.part?` (${p.part})`:""}. A backup QB is worth roughly a touchdown of line value and pulls the total down. Check whether the line already moved — if it hasn't, that's your edge.`});
+      if(p.pos==="QB") E.push({k:g.lg==="nfl"?"lean":"strong",dir:opp,cat:"qbout",play:`Fade ${t.ab} — QB out`,why:`${p.nm} (QB) listed ${p.st}${p.part?` (${p.part})`:""}. A backup QB is worth roughly a touchdown of line value and pulls the total down. Check whether the line already moved — if it hasn't, that's your edge.`});
       else if(p.pos==="RB"||p.pos==="WR"||p.pos==="TE") E.push({k:"lean",dir:null,cat:"skillout",play:`${t.ab} down a starter (${p.pos})`,why:`${p.nm} (${p.pos}) listed ${p.st}${p.part?` (${p.part})`:""}. Watch the total and that player's prop market.`});
     });
   });
