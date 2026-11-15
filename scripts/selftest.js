@@ -157,6 +157,23 @@ console.log("\n— verdict.js: the 55–58% model tier is a stake only in weeks 
   ok("dog-implied-<=10 OVER stays a play late in the season", plays(cfb(11,56.5,"OVER",{dogimp10:true})).length===1);
   ok("the late gate starts at week 7", V.LATE_WK===7);
 }
+console.log("\n— anytime-TD model: calibration constants, freshness, role collapse (offline) —");
+{
+  const TD=require(path.join(ROOT,"api/_td.js")), CAL=require(path.join(ROOT,"api/_tdcal.js"));
+  const g=(ra,tg)=>({pts:24,pl:{A:{n:"Alpha",ra,tg,rtd:0,rctd:0,rec:0,xtd:0},B:{n:"Beta",ra:10,tg:3,rtd:0,rctd:0,rec:0,xtd:0}}});
+  const lam=(hist,cal)=>{ const r=TD.teamLambdas(hist,24,.1,"cfb",new Set(),cal).find(x=>x.id==="A"); return r?r.lam:null; };
+  const stable=[g(12,3),g(12,3),g(12,3),g(12,3),g(12,3),g(12,3)];
+  const fell=[g(1,0),g(1,0),g(12,3),g(12,3),g(12,3),g(12,3)];
+  ok("constants live in api/_tdcal.js and are sane", CAL.K_SHRINK>0&&CAL.K_SHRINK<1&&CAL.EDGE_CAP>CAL.MIN_RAW_EDGE, `k=${CAL.K_SHRINK}, cap=${CAL.EDGE_CAP*100} pts`);
+  ok("a steady role is not zeroed", lam(stable,CAL)>0);
+  ok("a role that collapsed in his last 2 games is zeroed", lam(fell,CAL)===0);
+  ok("collapse rule off (ratio -1) leaves him on the board", lam(fell,{...CAL,COLLAPSE_RATIO:-1})>0);
+  const was=[g(2,0),g(2,0),g(12,3),g(12,3),g(12,3),g(12,3)], rising=[g(12,3),g(12,3),g(2,0),g(2,0),g(2,0),g(2,0)];
+  ok("recent games count more: a rising role scores higher with the boost than without",
+     lam(rising,{...CAL,COLLAPSE_RATIO:-1})>lam(rising,{...CAL,COLLAPSE_RATIO:-1,RECENT_BOOST:1}));
+  const mkt=.2, model=.5, shown=mkt+CAL.K_SHRINK*(model-mkt);
+  ok("shrink pulls a big model number back toward the price", shown>mkt&&shown<model&&Math.abs(shown-(mkt+CAL.K_SHRINK*(model-mkt)))<1e-9, `${model*100}% model vs ${mkt*100}% price → ${(shown*100).toFixed(1)}% shown`);
+}
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail?1:0);
