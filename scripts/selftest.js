@@ -164,6 +164,13 @@ console.log("\n— anytime-TD model: calibration constants, freshness, role coll
   const lam=(hist,cal)=>{ const r=TD.teamLambdas(hist,24,.1,"cfb",new Set(),cal).find(x=>x.id==="A"); return r?r.lam:null; };
   const stable=[g(12,3),g(12,3),g(12,3),g(12,3),g(12,3),g(12,3)];
   const fell=[g(1,0),g(1,0),g(12,3),g(12,3),g(12,3),g(12,3)];
+  // 2026-11-23: NFL and college share team codes (CIN = Bengals and Cincinnati Bearcats). A team's history must come from its own league.
+  { const box=(lg,date,name)=>({lg,date,t:{CIN:{pts:20,pl:{[name]:{n:name,ra:10,tg:2,rtd:1,rctd:0,rec:1,xtd:0}}},XXX:{pts:10,pl:{}}}});
+    const boxes=[box("cfb","2026-11-21T20:00Z","Bearcat"),box("nfl","2026-11-16T18:00Z","Bengal")];
+    const hn=TD.teamHistory(boxes,"CIN",new Date("2026-11-24T01:00Z"),"nfl");
+    ok("an NFL team's history holds no college game with the same team code", hn.length===1&&Object.values(hn[0].pl)[0].n==="Bengal", hn.map(T=>Object.values(T.pl)[0].n).join(","));
+    let threw=false; try{ TD.teamHistory(boxes,"CIN",new Date()); }catch(e){ threw=true; }
+    ok("teamHistory refuses a call without a league", threw); }
   ok("constants live in api/_tdcal.js and are sane", CAL.K_SHRINK>0&&CAL.K_SHRINK<1&&CAL.EDGE_CAP>CAL.MIN_RAW_EDGE, `k=${CAL.K_SHRINK}, cap=${CAL.EDGE_CAP*100} pts`);
   ok("a steady role is not zeroed", lam(stable,CAL)>0);
   ok("a role that collapsed in his last 2 games is zeroed", lam(fell,CAL)===0);

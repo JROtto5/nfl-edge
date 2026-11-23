@@ -31,7 +31,7 @@ async function fdPrices(games){
 function backtest(boxes,lines){
   const res={nfl:[],cfb:[]};
   for(const b of boxes){ const g=lines[b.id]; if(!g) continue; const k=T.tdPerPoint(boxes,b.lg);
-    for(const team of Object.keys(b.t)){ const hist=T.teamHistory(boxes,team,new Date(b.date)); if(hist.length<2) continue;
+    for(const team of Object.keys(b.t)){ const hist=T.teamHistory(boxes,team,new Date(b.date),b.lg); if(hist.length<2) continue;
       T.teamLambdas(hist,T.implied(g,team),k,b.lg).forEach((x,i)=>{ const a=b.t[team].pl[x.id]; res[b.lg].push({p:x.p,y:a&&(a.rtd+a.rctd+a.xtd)>0?1:0,rank:i}); }); } }
   const out={};
   for(const lg of ["nfl","cfb"]){ const R=res[lg]; if(!R.length){ out[lg]=null; continue; }
@@ -62,7 +62,7 @@ async function buildTD(){
   const {prices,status}=await fdPrices(games);
   const L=log||{plays:{}}; const plays=[];
   const board=games.map(g=>{
-    const teams=[g.away,g.home].map(team=>{ const hist=T.teamHistory(boxes,team,new Date(g.date));
+    const teams=[g.away,g.home].map(team=>{ const hist=T.teamHistory(boxes,team,new Date(g.date),g.lg);
       const all=T.teamLambdas(hist,T.implied(g,team),k[g.lg],g.lg,g.outSet[team]||new Set());
       const imp_=T.implied(g,team), avg=g.lg==="nfl"?22:28, opp=team===g.home?g.away:g.home, fav=(team===g.home?g.spread<0:g.spread>0);
       const rk=(f,x)=>1+all.filter(y=>y[f]>x[f]).length;
