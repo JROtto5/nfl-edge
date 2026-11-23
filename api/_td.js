@@ -59,8 +59,11 @@ async function updateBoxes(cache,limit=400){
 /* ---------- model ---------- */
 // offensive (rush+rec) TDs per point, measured from the box scores
 function tdPerPoint(boxes,lg){ let td=0,pts=0; boxes.forEach(b=>{ if(b.lg!==lg) return; Object.values(b.t).forEach(T=>{ pts+=T.pts; Object.values(T.pl).forEach(p=>td+=p.rtd+p.rctd); }); }); return pts?td/pts:.105; }
-function teamHistory(boxes,team,before){
-  return boxes.filter(b=>b.t[team]&&new Date(b.date)<before).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,P.games).map(b=>b.t[team]);
+/* lg is required: NFL and college share team codes (CIN = Bengals and Cincinnati Bearcats, HOU, MIA, ...).
+   Without it the Bengals' list carried Bearcats players (2026-11-23: "Cole Tabb", "JC French IV"). */
+function teamHistory(boxes,team,before,lg){
+  if(!lg) throw new Error("teamHistory needs lg: team codes collide across leagues");
+  return boxes.filter(b=>b.lg===lg&&b.t[team]&&new Date(b.date)<before).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,P.games).map(b=>b.t[team]);
 }
 /* role collapse: he averaged real touches (carries+targets) before, and in his last N games well under a third of that */
 function collapsed(hist,id,cal){
