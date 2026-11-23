@@ -91,7 +91,7 @@ async function buildTD(){
         if(imp!=null) x.p=imp+C.K_SHRINK*(model-imp);          // shown chance = book's price pulled a quarter of the way toward the model
         const ev=a!=null?x.p*dec(a)-1:null;
         return {id:x.id,n:x.n,p:Math.round(x.p*1000)/10,model:Math.round(model*1000)/10,gap:gap!=null?Math.round(gap*1000)/10:null,play:imp!=null&&model>=RULE.minP&&gap>=C.MIN_RAW_EDGE&&gap<=C.EDGE_CAP&&x.p-imp>=C.MIN_EDGE,watch:imp!=null&&model>=RULE.minP&&gap>C.EDGE_CAP,lam:Math.round(x.lam*1000)/1000,raw:Math.round(x.raw*1000)/10,ev:ev!=null?Math.round(ev*1000)/1000:null,why:whyOf(x,a,imp),price:a??null,imp:imp!=null?Math.round(imp*1000)/10:null,edge:imp!=null?Math.round((x.p-imp)*1000)/10:null,raS:Math.round(x.raS*100),tgS:Math.round(x.tgS*100)}; });
-      return {team,implied:Math.round(T.implied(g,team)*10)/10,xtd:Math.round(T.implied(g,team)*k[g.lg]*100)/100,games:hist.length,players:pl}; });
+      return {team,implied:Math.round(T.implied(g,team)*10)/10,xtd:Math.round(T.teamTDs(T.implied(g,team),k[g.lg],g.lg)*T.teamEff(hist,k[g.lg])*100)/100,games:hist.length,players:pl}; });
     // plays: model beats FanDuel's price by the margin, best edges first, max 3 a game
     const cand=teams.flatMap(t=>t.players.map(p=>({...p,team:t.team}))).filter(p=>p.play).sort((a,b)=>b.edge-a.edge).slice(0,RULE.perGame);
     cand.forEach(p=>{ const key=g.id+"|"+p.id; const rec=L.plays[key];
@@ -106,6 +106,6 @@ async function buildTD(){
   const lines={}; Object.entries(past||{}).forEach(([id,o])=>{ if(o&&o.total!=null&&o.spread!=null) lines[id]=o; });
   const graded=Object.values(L.plays).filter(r=>r.result).sort((a,b)=>new Date(b.date)-new Date(a.date));
   board.sort((a,b)=>new Date(a.date)-new Date(b.date)); plays.sort((a,b)=>b.edge-a.edge);
-  return {generatedAt:new Date().toISOString(),rule:RULE,fanduel:status,k,games:board,plays,history:graded.slice(0,200),backtest:backtest(boxes,lines)};
+  return {generatedAt:new Date().toISOString(),rule:RULE,fanduel:status,k,avgPts:C.AVG_TEAM_PTS,games:board,plays,history:graded.slice(0,200),backtest:backtest(boxes,lines)};
 }
 module.exports={buildTD,norm};
