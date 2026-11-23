@@ -1,8 +1,9 @@
 /* Anytime-TD engine (NFL + college).
    A player's chance to score = 1 − e^(−λ), where
      λ = team's expected offensive TDs × the player's share of them.
-   • Team expected TDs come from the betting line: implied points (total & spread) × k,
-     with k (offensive TDs per point) measured from this season's box scores.
+   • Team expected TDs come from the betting line: implied points (total & spread) × k, with k (offensive TDs
+     per point) measured from this season's box scores. The line is dampened (TDs grow with points^γ, γ<1:
+     blowouts spread TDs over backups) and nudged by the team's own recent TDs per point (see _tdcal.js).
    • The player's share splits into rushing and receiving: his share of the team's rush TDs
      and rec TDs, each SHRUNK toward his share of carries / targets (opportunity is far more
      stable than a handful of TDs). Recent games count more (0.85^gamesAgo, last 6 games).
@@ -13,8 +14,8 @@ const {fetchOne}=require("./_espn.js"); const C=require("./_tdcal.js");
 const SITE={nfl:"https://site.api.espn.com/apis/site/v2/sports/football/nfl",cfb:"https://site.api.espn.com/apis/site/v2/sports/football/college-football"};
 /* tuned on every 2026 game (log-loss): opportunity share dominates (alpha 30), missing the
    last game is a mild penalty, then a pooled Platt calibration pulls the top end in. */
-const P={ alpha:{nfl:30,cfb:30}, decay:.85, games:6, absentMult:.8, platt:[-.28,.841] };
-const calib=p=>{ const q=Math.min(.98,Math.max(.005,p)), z=P.platt[0]+P.platt[1]*Math.log(q/(1-q)); return 1/(1+Math.exp(-z)); };
+const P={ alpha:{nfl:30,cfb:30}, decay:.85, games:6, absentMult:.8 };
+const calib=p=>{ const q=Math.min(.98,Math.max(.005,p)), z=C.PLATT[0]+C.PLATT[1]*Math.log(q/(1-q)); return 1/(1+Math.exp(-z)); };
 async function pool(items,n,fn){ const out=new Array(items.length); let i=0; await Promise.all(Array.from({length:n},async()=>{ while(i<items.length){ const k=i++; try{ out[k]=await fn(items[k]); }catch(e){ out[k]=null; } } })); return out; }
 
 /* ---------- box scores ---------- */
@@ -72,6 +73,12 @@ function collapsed(hist,id,cal){
   const was=older.reduce((s,T)=>s+t(T),0)/older.length; if(was<cal.COLLAPSE_MIN_TOUCH) return false;
   return hist.slice(0,N).reduce((s,T)=>s+t(T),0)/N < cal.COLLAPSE_RATIO*was;
 }
+/* a team's expected offensive TDs from the line: k × avg × (implied/avg)^γ (γ=1 would be the straight line k × implied) */
+const teamTDs=(implied,k,lg,cal=C)=>{ const a=cal.AVG_TEAM_PTS[lg]; return k*a*Math.pow(Math.max(0,implied)/a,cal.LINE_GAMMA); };
+/* the team's own TDs per point over its history vs the league's k, shrunk toward 1 with TEAM_K_POINTS points of league-rate history */
+function teamEff(hist,k,cal=C){ if(!hist.length||!(k>0)) return 1; let td=0,pts=0;
+  hist.forEach(T=>{ pts+=T.pts||0; Object.values(T.pl).forEach(p=>td+=p.rtd+p.rctd); });
+  return ((td+cal.TEAM_K_POINTS*k)/(pts+cal.TEAM_K_POINTS))/k; }
 /* expected TD rate per player for one team, given implied points */
 function teamLambdas(hist,implied,k,lg,out=new Set(),cal=C){
   if(!hist.length) return [];
@@ -79,7 +86,7 @@ function teamLambdas(hist,implied,k,lg,out=new Set(),cal=C){
   hist.forEach((T,g)=>{ const w=Math.pow(P.decay,g)*(g<cal.RECENT_GAMES?cal.RECENT_BOOST:1); W+=w;
     Object.entries(T.pl).forEach(([id,p])=>{ const q=pl[id]=pl[id]||{id,n:p.n,ra:0,tg:0,rtd:0,rctd:0,xtd:0,gp:0,last:false,tdc:0,gn:0,rec:0};
       q.ra+=w*p.ra; q.tg+=w*p.tg; q.rtd+=w*p.rtd; q.rctd+=w*p.rctd; q.xtd+=w*p.xtd; q.gp+=w; q.tdc+=p.rtd+p.rctd+p.xtd; q.gn++; if(g===0) q.last=true; RA+=w*p.ra; TG+=w*p.tg; RTD+=w*p.rtd; CTD+=w*p.rctd; }); });
-  const fr=(RTD+1.5)/(RTD+CTD+3), a=P.alpha[lg], E=implied*k;
+  const fr=(RTD+1.5)/(RTD+CTD+3), a=P.alpha[lg], E=teamTDs(implied,k,lg,cal)*teamEff(hist,k,cal);
   let L=Object.values(pl).map(q=>{
     const raS=RA?q.ra/RA:0, tgS=TG?q.tg/TG:0;
     const rS=(q.rtd+a*raS)/(RTD+a), cS=(q.rctd+a*tgS)/(CTD+a);
@@ -95,4 +102,4 @@ function teamLambdas(hist,implied,k,lg,out=new Set(),cal=C){
 }
 const implied=(g,team)=>{ const h=(g.total-g.spread)/2; return team===g.home?h:g.total-h; };   // spread is the home line
 
-module.exports={calib,parseBox,updateBoxes,listFinished,tdPerPoint,teamHistory,teamLambdas,implied,P,pool,SITE};
+module.exports={calib,parseBox,updateBoxes,listFinished,tdPerPoint,teamHistory,teamLambdas,teamTDs,teamEff,implied,P,pool,SITE};

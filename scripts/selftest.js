@@ -178,6 +178,23 @@ console.log("\n— anytime-TD model: calibration constants, freshness, role coll
   const was=[g(2,0),g(2,0),g(12,3),g(12,3),g(12,3),g(12,3)], rising=[g(12,3),g(12,3),g(2,0),g(2,0),g(2,0),g(2,0)];
   ok("recent games count more: a rising role scores higher with the boost than without",
      lam(rising,{...CAL,COLLAPSE_RATIO:-1})>lam(rising,{...CAL,COLLAPSE_RATIO:-1,RECENT_BOOST:1}));
+  // 2026-11-23 held-out finding: a team's TDs do not grow 1:1 with the line's implied points (underdogs' top players
+  // scored ~2x what the linear model gave them), and teams differ in TDs per point. Both live in _tdcal.js.
+  { const lamAt=(imp,cal)=>{ const r=TD.teamLambdas(stable,imp,.1,"cfb",new Set(),{...cal,COLLAPSE_RATIO:-1}).find(x=>x.id==="A"); return r.lam; };
+    ok("line dampening constants live in api/_tdcal.js and are sane", CAL.LINE_GAMMA>0&&CAL.LINE_GAMMA<1&&CAL.AVG_TEAM_PTS.nfl>15&&CAL.AVG_TEAM_PTS.cfb>15&&CAL.TEAM_K_POINTS>0, `gamma=${CAL.LINE_GAMMA}, avg pts ${CAL.AVG_TEAM_PTS&&CAL.AVG_TEAM_PTS.nfl}/${CAL.AVG_TEAM_PTS&&CAL.AVG_TEAM_PTS.cfb}, team-eff weight ${CAL.TEAM_K_POINTS} pts`);
+    const flat={...CAL,LINE_GAMMA:1,TEAM_K_POINTS:1e12};   // the old model: linear in implied points, no team factor
+    ok("old behaviour (gamma 1, no team factor): doubling implied points doubles a player's rate", Math.abs(lamAt(40,flat)/lamAt(20,flat)-2)<1e-9, `${(lamAt(40,flat)/lamAt(20,flat)).toFixed(4)}x`);
+    const r=lamAt(40,CAL)/lamAt(20,CAL);
+    ok("shipped model: doubling implied points raises a player's rate, but by less than 2x", r>1.1&&r<2-1e-6, `${r.toFixed(3)}x (gamma ${CAL.LINE_GAMMA}: expect ${Math.pow(2,CAL.LINE_GAMMA).toFixed(3)}x)`);
+    ok("teamTDs(): at the league-average implied points a team gets k x average points", Math.abs(TD.teamTDs(CAL.AVG_TEAM_PTS.cfb,.1,"cfb")-.1*CAL.AVG_TEAM_PTS.cfb)<1e-9);
+    ok("teamTDs(): a 10-pt team gets more TDs per point than a 35-pt team", TD.teamTDs(10,.1,"cfb")/10>TD.teamTDs(35,.1,"cfb")/35);
+    const tm=(tds)=>({pts:24,pl:{A:{n:"Alpha",ra:12,tg:3,rtd:tds,rctd:0,rec:0,xtd:0}}});
+    const eff=[1,2,3,4,5,6].map(()=>tm(3)), ineff=[1,2,3,4,5,6].map(()=>tm(0));        // 3 TDs on 24 pts a game vs none
+    ok("teamEff(): a team that turns points into TDs more than the league does is above 1, one that doesn't is below 1", TD.teamEff(eff,.1,CAL)>1.1&&TD.teamEff(ineff,.1,CAL)<.6, `${TD.teamEff(eff,.1,CAL).toFixed(3)} / ${TD.teamEff(ineff,.1,CAL).toFixed(3)}`);
+    ok("teamEff() is shrunk toward 1, not the raw ratio (raw would be 1.25/.1 = 12.5)", TD.teamEff(eff,.1,CAL)<CAL.TEAM_K_POINTS&&TD.teamEff(eff,.1,CAL)<2.5);
+    ok("teamEff() is exactly 1 with the weight set huge, and with no history", Math.abs(TD.teamEff(eff,.1,{...CAL,TEAM_K_POINTS:1e12})-1)<1e-6&&TD.teamEff([],.1,CAL)===1);
+    ok("teamLambdas() carries the team factor: an efficient team's top player is rated above an inefficient team's", TD.teamLambdas(eff,24,.1,"cfb",new Set(),{...CAL,COLLAPSE_RATIO:-1})[0].lam>TD.teamLambdas(ineff,24,.1,"cfb",new Set(),{...CAL,COLLAPSE_RATIO:-1})[0].lam);
+    ok("Platt constants live in api/_tdcal.js and calib() uses them", Array.isArray(CAL.PLATT)&&CAL.PLATT.length===2&&Math.abs(TD.calib(.3)-1/(1+Math.exp(-(CAL.PLATT[0]+CAL.PLATT[1]*Math.log(.3/.7)))))<1e-12, `[${(CAL.PLATT||[]).join(", ")}]`); }
   const mkt=.2, model=.5, shown=mkt+CAL.K_SHRINK*(model-mkt);
   ok("shrink pulls a big model number back toward the price", shown>mkt&&shown<model&&Math.abs(shown-(mkt+CAL.K_SHRINK*(model-mkt)))<1e-9, `${model*100}% model vs ${mkt*100}% price → ${(shown*100).toFixed(1)}% shown`);
 }
